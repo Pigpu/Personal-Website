@@ -1,0 +1,16 @@
+# Java 后端忽略
+target/
+*.class
+.mvn/
+.idea/
+*.iml
+application.yml
+
+# Vue 前端忽略
+portfolio-frontend/node_modules/
+portfolio-frontend/dist/
+portfolio-frontend/.vscode/
+
+# 操作系统忽略
+.DS_Store
+Thumbs.db
