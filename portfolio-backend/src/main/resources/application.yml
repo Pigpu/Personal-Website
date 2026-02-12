@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: portfolio-backend
+
+  # 数据库连接配置
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5433/portfolio_db
+    username: admin
+    password: admin123
+    driver-class-name: org.postgresql.Driver
+
+  # JPA / Hibernate 配置
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      # update 模式：如果数据库表不存在，会自动根据 Java 代码创建
+      ddl-auto: update
+    show-sql: true # 在控制台打印 SQL 语句，方便调试
+    properties:
+      hibernate:
+        format_sql: true
+
+# 开启 Java 21 虚拟线程 (2026年项目的标配)
+spring.threads.virtual.enabled: true
