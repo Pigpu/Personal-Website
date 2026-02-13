@@ -1,6 +1,9 @@
 import { createApp } from 'vue'
-import './style.css'
 import App from './App.vue'
-import './style.css' // 确保这一行存在，它会引入我们写了 @import "tailwindcss" 的文件
+import router from './router' // 引入刚才写的路由配置
+import './style.css' // 确保 Tailwind 样式还在
 
-createApp(App).mount('#app')
+const app = createApp(App)
+
+app.use(router) // 核心：使用路由实例
+app.mount('#app')

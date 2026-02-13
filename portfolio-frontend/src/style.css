@@ -1,1 +1,41 @@
 @import "tailwindcss";
+html {
+  /* 核心黑科技：始终保留滚动条间隙，即使没有滚动条也不偏移 */
+  scrollbar-gutter: stable;
+}
+
+body {
+  /* 确保页面切换时背景平滑 */
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* 1. 给最底层的 html 涂上和背景一致的深色 */
+html {
+  scrollbar-gutter: stable;
+  /* 使用你背景中常用的 slate-950 深蓝色，填补预留出来的空白间隙 */
+  background-color: #020617; 
+}
+
+/* 2. 彻底透明化轨道，并优化滑块视觉 */
+::-webkit-scrollbar {
+  width: 10px; /* 细一点更精致 */
+}
+
+::-webkit-scrollbar-track {
+  background: transparent !important; /* 强制轨道透明，透出下方的底色 */
+}
+
+::-webkit-scrollbar-thumb {
+  /* 使用更低调的半透明白色，不再是一根亮晃晃的白条 */
+  background-color: rgba(255, 255, 255, 0.3); 
+  border-radius: 20px;
+  /* 增加一个透明边框，让它看起来在视觉上更“瘦”且不贴边 */
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  /* 鼠标悬停时，呈现淡淡的蓝色光泽，呼应你的主题 */
+  background-color: rgba(96, 165, 250, 0.3);
+}
