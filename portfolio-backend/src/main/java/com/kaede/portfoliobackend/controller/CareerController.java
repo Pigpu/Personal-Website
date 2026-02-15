@@ -1,6 +1,6 @@
 package com.kaede.portfoliobackend.controller;
 
-import com.kaede.portfoliobackend.model.Career;
+import com.kaede.portfoliobackend.entity.Career;
 import com.kaede.portfoliobackend.repository.CareerRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;

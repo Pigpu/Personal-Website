@@ -1,6 +1,6 @@
 package com.kaede.portfoliobackend.repository;
 
-import com.kaede.portfoliobackend.model.Career;
+import com.kaede.portfoliobackend.entity.Career;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

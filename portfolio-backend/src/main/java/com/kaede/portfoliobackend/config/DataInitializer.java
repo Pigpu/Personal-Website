@@ -1,6 +1,6 @@
 package com.kaede.portfoliobackend.config;
 
-import com.kaede.portfoliobackend.model.Career;
+import com.kaede.portfoliobackend.entity.Career;
 import com.kaede.portfoliobackend.repository.CareerRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;

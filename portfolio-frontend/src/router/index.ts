@@ -3,6 +3,10 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import CareerView from '../views/CareerView.vue'
 import MomentsView from '../views/MomentsView.vue'
+import EditorView from '../views/EditorView.vue'
+import ArticlesView from '../views/ArticlesView.vue'
+import ArticleDetailView from '../views/ArticleDetailView.vue'
+import LoginView from '../views/LoginView.vue'
 
 const routes = [
   {
@@ -19,7 +23,27 @@ const routes = [
     path: '/moments',
     name: 'moments',
     component: MomentsView
-  }
+  },
+  {
+    path: '/editor',
+    name: 'editor',
+    component: EditorView
+  },
+  {
+    path: '/articles',
+    name: 'articles',
+    component: ArticlesView
+  },
+  {
+    path: '/article/:id',
+    name: 'article-detail',
+    component: ArticleDetailView
+  },
+{
+    path: '/login',
+    name: 'login',
+    component: LoginView
+  },
 ]
 
 const router = createRouter({

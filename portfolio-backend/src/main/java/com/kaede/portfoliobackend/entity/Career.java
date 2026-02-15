@@ -1,4 +1,4 @@
-package com.kaede.portfoliobackend.model; // 确保包名与你的项目一致
+package com.kaede.portfoliobackend.entity; // 确保包名与你的项目一致
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

@@ -11,6 +11,12 @@ interface Career {
   tags: string;
 }
 
+// 暂时通过 localStorage 判断角色，等做完登录，这里会自动生效
+const userRole = ref(localStorage.getItem('user_role') || 'GUEST');
+
+// 定义一个计算属性，判断是否为管理员
+const isAdmin = computed(() => userRole.value === 'ROLE_ADMIN');
+
 const careerList = ref<Career[]>([]);
 const showModal = ref(false); // 控制弹窗显示
 const isEditing = ref(false);
@@ -61,13 +67,6 @@ const submitForm = async () => {
   await axios.post("http://localhost:8080/api/career/save", payload);
   closeModal();
   fetchCareers();
-};
-
-const deleteItem = async (id: number) => {
-  if (confirm("确定要删除这条经历吗？")) {
-    await axios.delete(`http://localhost:8080/api/career/delete/${id}`);
-    fetchCareers();
-  }
 };
 
 // 打开弹窗进行新增
@@ -145,17 +144,17 @@ onMounted(fetchCareers);
 
 <template>
   <div class="relative min-h-screen text-slate-100 font-sans overflow-x-hidden">
-
-    <div class="relative z-10 p-8">
+    <div class="relative z-10 px-8 pb-8">
       <header class="max-w-4xl mx-auto flex justify-between items-center mb-12">
         <div>
-          <h1 class="text-4xl font-black bg-clip-text text-transparent bg-linear-to-r from-blue-400 to-indigo-400">
+          <h1 class="text-4xl font-black bg-linear-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
             生涯经历
           </h1>
           <p class="text-slate-500 text-sm mt-1">这里展示我的生涯经历（只有我可以修改哦）</p>
         </div>
 
         <button
+          v-if="isAdmin"
           @click="openAddModal"
           class="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-full font-bold transition-all shadow-lg shadow-blue-900/40 active:scale-95"
         >
@@ -177,10 +176,12 @@ onMounted(fetchCareers);
             </div>
             <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
+                v-if="isAdmin"
                 @click="editItem(item)"
                 class="p-2 text-slate-400 hover:text-blue-400 transition-colors"
               >编辑</button>
               <button
+                v-if="isAdmin"
                 @click="openDeleteModal(item.id)"
                 class="p-2 text-slate-400 hover:text-red-400 transition-colors"
               >删除</button>
