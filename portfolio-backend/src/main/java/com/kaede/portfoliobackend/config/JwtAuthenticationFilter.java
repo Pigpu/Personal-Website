@@ -36,6 +36,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String username = jwtUtils.extractUsername(token);
                 String role = jwtUtils.extractRole(token);
 
+                // 在 JwtAuthenticationFilter 中
+                if (role != null) {
+                    // 确保这里的 role 是 "ROLE_ADMIN"，而不是 "ADMIN"
+                    // 如果数据库存的是 "ADMIN"，这里要写成: "ROLE_" + role
+                    String authorityRole = role.startsWith("ROLE_") ? role : "ROLE_" + role;
+                    SimpleGrantedAuthority authority = new SimpleGrantedAuthority(authorityRole);
+
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            username, null, Collections.singletonList(authority));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
+
                 // 在 JwtAuthenticationFilter.java 的 doFilterInternal 中
                 if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     // 打印一下，看看解析出来的用户名和角色对不对

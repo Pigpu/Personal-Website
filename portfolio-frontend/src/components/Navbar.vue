@@ -36,6 +36,7 @@ const navLinks = [
   { name: "主页", path: "/" },
   { name: "生涯", path: "/career" },
   { name: "生活", path: "/articles" },
+  { name: "作品", path: "/projects" }
 ];
 </script>
 

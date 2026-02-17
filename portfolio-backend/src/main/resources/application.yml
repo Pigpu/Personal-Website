@@ -4,9 +4,12 @@ spring:
   servlet:
     multipart:
       # 单个文件的最大限制（根据需要调整，建议 10MB-50MB）
-      max-file-size: 10MB
+      max-file-size: 150MB
       # 单个请求的总大小限制
-      max-request-size: 50MB
+      max-request-size: 150MB
+  web:
+    resources:
+      static-locations: file:D:/HomePageProject/HomepageDB/uploads/,classpath:/static/
 
   # 数据库连接配置
   datasource:

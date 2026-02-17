@@ -7,6 +7,10 @@ import EditorView from '../views/EditorView.vue'
 import ArticlesView from '../views/ArticlesView.vue'
 import ArticleDetailView from '../views/ArticleDetailView.vue'
 import LoginView from '../views/LoginView.vue'
+import ProjectListView from '../views/ProjectListView.vue' 
+import ProjectUploadView from '../views/ProjectUploadView.vue'
+import ProjectDetailView from '../views/ProjectDetailView.vue'
+
 
 const routes = [
   {
@@ -39,11 +43,26 @@ const routes = [
     name: 'article-detail',
     component: ArticleDetailView
   },
-{
+  {
     path: '/login',
     name: 'login',
     component: LoginView
   },
+  {
+    path: '/projects',
+    name: 'Projects',
+    component: ProjectListView
+  },
+  {
+    path: '/projects/upload',
+    name: 'ProjectUpload',
+    component: ProjectUploadView
+  },
+  {
+  path: '/projects/:id', 
+  name: 'ProjectDetail',
+  component: () => import('../views/ProjectDetailView.vue')
+  }
 ]
 
 const router = createRouter({

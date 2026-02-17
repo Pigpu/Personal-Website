@@ -13,6 +13,7 @@ const newComment = ref("");
 const isLoggedIn = computed(() => !!localStorage.getItem("token"));
 const currentParentId = ref<number | null>(null); // 记录父评论 ID
 const replyToUsername = ref(""); // 记录被回复人的名字
+const hasLiked = ref(false);
 // --- 新增：删除弹窗的状态控制 ---
 const showDeleteModal = ref(false);
 const commentIdToDelete = ref<number | null>(null);
@@ -32,10 +33,24 @@ const fetchArticle = async () => {
 
 // 点赞逻辑
 const handleLike = async () => {
-  await fetch(`http://localhost:8080/api/articles/${article.value.id}/like`, {
-    method: "POST",
-  });
-  article.value.likeCount++; // 前端数值同步增加
+  if (hasLiked.value) return;
+  try {
+    // 使用 axios 并处理响应
+    const res = await axios.post(
+      `http://localhost:8080/api/articles/${article.value.id}/like`
+    );
+    // 后端最好返回最新的点赞数，这里假设返回了数字，或者直接前端 +1
+    // 如果后端返回的是 int (新点赞数):
+    if (typeof res.data === "number") {
+      article.value.likeCount = res.data;
+      hasLiked.value = true;
+    } else {
+      article.value.likeCount++;
+    }
+  } catch (error) {
+    console.error("点赞失败", error);
+    alert("点赞失败，可能需要登录");
+  }
 };
 
 onMounted(fetchArticle);
@@ -169,7 +184,9 @@ const confirmDelete = async () => {
   if (!commentIdToDelete.value) return;
 
   try {
-    await axios.delete(`http://localhost:8080/api/comments/${commentIdToDelete.value}`);
+    await axios.delete(
+      `http://localhost:8080/api/comments/${commentIdToDelete.value}`
+    );
     // 删除成功后
     showDeleteModal.value = false;
     commentIdToDelete.value = null;
@@ -207,22 +224,24 @@ const confirmDelete = async () => {
         </div>
       </header>
 
-      <div
-        v-if="article.coverUrl"
-        class="mb-12 rounded-3xl overflow-hidden shadow-2xl"
-      >
-        <img
-          :src="article.coverUrl"
-          class="w-full object-cover max-h-100"
-        />
-      </div>
-
       <div class="bg-slate-900/40 backdrop-blur-xl border border-white/10 p-8 md:p-12 rounded-4xl shadow-2xl">
         <MdPreview
           :modelValue="article.content"
           theme="dark"
         />
       </div>
+
+      <div class="mt-10 bg-slate-900/40 border border-white/10 p-8 rounded-[2.5rem] text-center backdrop-blur-xl">
+            <button 
+              @click="handleLike"
+              :class="['w-20 h-20 rounded-full flex items-center justify-center text-3xl transition-all mb-4 mx-auto border-2', 
+                hasLiked ? 'bg-red-500 border-red-400 text-white scale-110 shadow-lg shadow-red-500/20' : 'bg-white/5 border-white/10 text-slate-500 hover:border-red-500/50 hover:text-red-500']"
+            >
+              ❤️
+            </button>
+            <p class="text-white font-black text-lg">{{ article.likeCount }}</p>
+            <p class="text-slate-500 text-[10px] font-bold uppercase mt-1">给作品点个赞</p>
+          </div>
 
       <footer class="mt-12 flex justify-center">
         <button
@@ -377,43 +396,49 @@ const confirmDelete = async () => {
         </div>
       </section>
       <Teleport to="body">
-  <Transition name="fade">
-    <div v-if="showDeleteModal" class="fixed inset-0 z-100 flex items-center justify-center p-6">
-      
-      <div class="absolute inset-0 bg-slate-950/60 backdrop-blur-md" @click="showDeleteModal = false"></div>
-      
-      <div class="relative w-full max-w-xs bg-slate-900/90 backdrop-blur-2xl border border-white/10 p-8 rounded-[2.5rem] shadow-2xl scale-in-center">
-        
-        <div class="w-12 h-12 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl border border-red-500/20">
-          🗑️
-        </div>
+        <Transition name="fade">
+          <div
+            v-if="showDeleteModal"
+            class="fixed inset-0 z-100 flex items-center justify-center p-6"
+          >
 
-        <div class="text-center mb-6">
-          <h3 class="text-lg font-black text-white">确定要删除吗？</h3>
-          <p class="text-slate-400 text-xs mt-2 leading-relaxed">
-            如果是父评论，下面的所有回复也会一起消失，且<span class="text-red-400">无法恢复</span>。
-          </p>
-        </div>
-        
-        <div class="space-y-3">
-          <button 
-            @click="confirmDelete"
-            class="w-full py-3 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-2xl transition-all shadow-lg shadow-red-500/30 active:scale-95"
-          >
-            确认删除
-          </button>
-          
-          <button 
-            @click="showDeleteModal = false"
-            class="w-full py-3 bg-white/5 hover:bg-white/10 text-slate-300 text-sm font-bold rounded-2xl transition-all border border-white/5 active:scale-95"
-          >
-            我再想想
-          </button>
-        </div>
-      </div>
-    </div>
-  </Transition>
-</Teleport>
+            <div
+              class="absolute inset-0 bg-slate-950/60 backdrop-blur-md"
+              @click="showDeleteModal = false"
+            ></div>
+
+            <div class="relative w-full max-w-xs bg-slate-900/90 backdrop-blur-2xl border border-white/10 p-8 rounded-[2.5rem] shadow-2xl scale-in-center">
+
+              <div class="w-12 h-12 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl border border-red-500/20">
+                🗑️
+              </div>
+
+              <div class="text-center mb-6">
+                <h3 class="text-lg font-black text-white">确定要删除吗？</h3>
+                <p class="text-slate-400 text-xs mt-2 leading-relaxed">
+                  如果是父评论，下面的所有回复也会一起消失，且<span class="text-red-400">无法恢复</span>。
+                </p>
+              </div>
+
+              <div class="space-y-3">
+                <button
+                  @click="confirmDelete"
+                  class="w-full py-3 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-2xl transition-all shadow-lg shadow-red-500/30 active:scale-95"
+                >
+                  确认删除
+                </button>
+
+                <button
+                  @click="showDeleteModal = false"
+                  class="w-full py-3 bg-white/5 hover:bg-white/10 text-slate-300 text-sm font-bold rounded-2xl transition-all border border-white/5 active:scale-95"
+                >
+                  我再想想
+                </button>
+              </div>
+            </div>
+          </div>
+        </Transition>
+      </Teleport>
     </div>
   </div>
 </template>
@@ -431,10 +456,12 @@ const confirmDelete = async () => {
 
 <style scoped>
 /* 弹窗背景淡入淡出 */
-.fade-enter-active, .fade-leave-active {
+.fade-enter-active,
+.fade-leave-active {
   transition: opacity 0.3s ease;
 }
-.fade-enter-from, .fade-leave-to {
+.fade-enter-from,
+.fade-leave-to {
   opacity: 0;
 }
 
@@ -444,7 +471,13 @@ const confirmDelete = async () => {
 }
 
 @keyframes scale-up {
-  0% { transform: scale(0.9); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 </style>

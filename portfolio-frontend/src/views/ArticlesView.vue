@@ -6,10 +6,10 @@ const router = useRouter();
 const articles = ref<any[]>([]);
 
 // 暂时通过 localStorage 判断角色，等做完登录，这里会自动生效
-const userRole = ref(localStorage.getItem('user_role') || 'GUEST');
+const userRole = ref(localStorage.getItem("user_role") || "GUEST");
 
 // 定义一个计算属性，判断是否为管理员
-const isAdmin = computed(() => userRole.value === 'ROLE_ADMIN');
+const isAdmin = computed(() => userRole.value === "ROLE_ADMIN");
 
 // 从后端获取文章列表
 const fetchArticles = async () => {
@@ -38,8 +38,8 @@ const deleteArticle = async (id: number) => {
       method: "DELETE",
       // 之后登录成功后，这里要带上 Token
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
     });
 
     // 2. 后端返回 403 时的处理
@@ -99,27 +99,52 @@ const goToDetail = (id: number) => {
         @click="goToDetail(article.id)"
         class="group cursor-pointer bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-3xl overflow-hidden hover:border-blue-500/50 transition-all duration-500 hover:-translate-y-2 shadow-xl hover:shadow-blue-500/10"
       >
-        <button
+        <div
           v-if="isAdmin"
-          @click.stop="deleteArticle(article.id)"
-          class="absolute top-4 right-4 z-30 p-2.5 bg-red-500/20 hover:bg-red-500 border border-red-500/50 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-all duration-300 backdrop-blur-md"
-          title="删除文章"
+          class="absolute top-4 right-4 z-30 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
+          <button
+            @click.stop="$router.push(`/editor?id=${article.id}`)"
+            class="p-2.5 bg-blue-500/20 hover:bg-blue-500 border border-blue-500/50 rounded-xl text-white backdrop-blur-md transition-all"
+            title="编辑文章"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-            />
-          </svg>
-        </button>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+              />
+            </svg>
+          </button>
+
+          <button
+            @click.stop="deleteArticle(article.id)"
+            class="p-2.5 bg-red-500/20 hover:bg-red-500 border border-red-500/50 rounded-xl text-white backdrop-blur-md transition-all"
+            title="删除文章"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
+          </button>
+        </div>
         <div class="h-48 overflow-hidden relative">
           <img
             v-if="article.coverUrl"

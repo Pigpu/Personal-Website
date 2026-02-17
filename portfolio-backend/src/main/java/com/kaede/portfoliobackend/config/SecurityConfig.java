@@ -35,31 +35,42 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // 2. 显式放行所有 OPTIONS 预检请求（这是解决 CORS 的关键）
+                        // 显式放行所有 OPTIONS 预检请求（这是解决 CORS 的关键）
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // 3. 【公开路径】 - 任何人都能看文章、生涯列表、图片
+                        // 【公开路径】 - 任何人都能看文章、生涯列表、图片
                         .requestMatchers(HttpMethod.GET, "/api/articles/**").permitAll()
                         // 修正路径匹配：覆盖 /api/career/list 以及未来可能的详情页
                         .requestMatchers(HttpMethod.GET, "/api/career/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
+
+                        //评论相关权限
                         .requestMatchers(HttpMethod.GET, "/api/comments/article/**").permitAll()//评论查询许可
-                        // 2. 需要【登录】即可操作：发表评论
+                        // 需要【登录】即可操作：发表评论
                         // 注意：这里用 authenticated()，不需要 ADMIN 角色，只要是注册用户就行
                         .requestMatchers(HttpMethod.POST, "/api/comments/save").authenticated()
                         // 删除评论必须是管理员 (ADMIN)
                         .requestMatchers(HttpMethod.DELETE, "/api/comments/**").hasRole("ADMIN")
 
-                        // 4. 【生涯管理权限】 - 仅限管理员
+                        // 【生涯管理权限】 - 仅限管理员
                         .requestMatchers(HttpMethod.POST, "/api/career/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/career/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/career/**").hasRole("ADMIN")
 
-                        // 5. 【文章管理权限】 - 仅限管理员
+                        // 【文章管理权限】 - 仅限管理员
                         .requestMatchers(HttpMethod.POST, "/api/articles/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/articles/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/articles/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/upload").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/articles/*/like").authenticated()
                         .requestMatchers("/api/upload/**").hasRole("ADMIN")
+
+                        // 【作品管理权限】
+                        .requestMatchers(HttpMethod.GET, "/api/projects/**").permitAll() // 大家都能看
+                        .requestMatchers(HttpMethod.POST, "/api/projects/*/like").authenticated() // 登录后能点赞
+                        .requestMatchers(HttpMethod.PUT, "/api/projects/*").authenticated() //只有管理员可以修改
+                        .requestMatchers("/api/projects/save", "/api/projects/delete/**").hasRole("ADMIN") // 只有管理员能存删
 
 
 
