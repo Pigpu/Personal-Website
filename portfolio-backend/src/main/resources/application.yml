@@ -10,6 +10,8 @@ spring:
   web:
     resources:
       static-locations: file:D:/HomePageProject/HomepageDB/uploads/,classpath:/static/
+  upload:
+    path: "file:/www/wwwroot/portfolio/uploads/"
 
   # 数据库连接配置
   datasource:

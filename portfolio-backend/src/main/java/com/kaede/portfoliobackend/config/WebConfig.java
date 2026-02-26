@@ -1,5 +1,6 @@
 package com.kaede.portfoliobackend.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -7,11 +8,14 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
+    // 读取配置文件中的 upload.path 变量
+    @Value("${upload.path}")
+    private String uploadPath;
+
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // 映射 /uploads/** 路径到电脑上的物理路径
-        // 注意：要把 "file:D:/portfolio/uploads/" 换成真实的文件夹路径
+        String location = uploadPath.startsWith("file:") ? uploadPath : "file:" + uploadPath;
         registry.addResourceHandler("/uploads/**")
-                .addResourceLocations("file:///D:/HomePageProject/HomepageDB/uploads/");
+                .addResourceLocations(location);
     }
 }

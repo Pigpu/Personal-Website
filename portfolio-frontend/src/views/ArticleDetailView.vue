@@ -17,40 +17,103 @@ const hasLiked = ref(false);
 // --- 新增：删除弹窗的状态控制 ---
 const showDeleteModal = ref(false);
 const commentIdToDelete = ref<number | null>(null);
+const likesList = ref<any[]>([]); // 存储点赞列表
+const showLikesList = ref(false); // 控制列表折叠/展开
+
+// 自定义消息提示状态
+const showMessageModal = ref(false);
+const messageConfig = ref({
+  type: 'warning', // 'warning', 'error', 'success'
+  title: '提示',
+  content: ''
+});
+
+// 触发自定义提示的函数（2秒后自动消失）
+const showMessage = (type: 'warning' | 'error' | 'success', title: string, content: string) => {
+  messageConfig.value = { type, title, content };
+  showMessageModal.value = true;
+  setTimeout(() => {
+    showMessageModal.value = false;
+  }, 2000); // 2秒后自动关闭
+};
+
+const isAdmin = computed(() => localStorage.getItem('user_role') === 'ROLE_ADMIN');
 
 // 获取文章详情
 const fetchArticle = async () => {
   const id = route.params.id;
   try {
-    const response = await fetch(`http://localhost:8080/api/articles/${id}`);
+    const response = await fetch(`/api/articles/${id}`);
     article.value = await response.json();
   } catch (error) {
     console.error("文章加载失败:", error);
   } finally {
     isLoading.value = false;
   }
+  // 文章加载完后，获取点赞状态
+  if (isLoggedIn.value) {
+    checkLikeStatus();
+  }
+  // 如果是管理员，顺便把点赞列表拉下来
+  if (isAdmin.value) {
+    fetchLikesList();
+  }
 };
 
-// 点赞逻辑
+// 点赞/取消点赞处理
 const handleLike = async () => {
-  if (hasLiked.value) return;
-  try {
-    // 使用 axios 并处理响应
-    const res = await axios.post(
-      `http://localhost:8080/api/articles/${article.value.id}/like`
-    );
-    // 后端最好返回最新的点赞数，这里假设返回了数字，或者直接前端 +1
-    // 如果后端返回的是 int (新点赞数):
-    if (typeof res.data === "number") {
-      article.value.likeCount = res.data;
-      hasLiked.value = true;
-    } else {
-      article.value.likeCount++;
-    }
-  } catch (error) {
-    console.error("点赞失败", error);
-    alert("点赞失败，可能需要登录");
+  if (!isLoggedIn.value) {
+    showMessage('warning', '需要登录', '请先登录才能为文章点赞哦~');
+    return;
   }
+  
+  try {
+    const res = await axios.post(`/api/articles/${article.value.id}/like`, {}, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    });
+    
+    // 后端返回了最新的数量和状态
+    article.value.likeCount = res.data.likeCount;
+    hasLiked.value = res.data.isLiked;
+    
+    // 如果是管理员，点赞后刷新一下列表
+    if (isAdmin.value) fetchLikesList();
+    
+  } catch (error) {
+    console.error("点赞操作失败", error);
+    showMessage('error', '操作失败', '点赞失败，请检查网络或重新登录后重试');
+  }
+};
+
+// 2. 检查当前用户是否点赞
+const checkLikeStatus = async () => {
+  try {
+    const res = await axios.get(`/api/articles/${route.params.id}/like-status`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    });
+    hasLiked.value = res.data;
+  } catch (error) {
+    console.error("获取点赞状态失败", error);
+  }
+};
+
+// 3. 获取点赞列表 (管理员)
+const fetchLikesList = async () => {
+  try {
+    const res = await axios.get(`/api/articles/${route.params.id}/likes-list`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    });
+    likesList.value = res.data;
+  } catch (error) {
+    console.error("获取点赞列表失败", error);
+  }
+};
+
+// 格式化时间辅助函数
+const formatDateTime = (dateStr: string) => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  return date.toLocaleString(); // 包含具体时间
 };
 
 onMounted(fetchArticle);
@@ -60,7 +123,7 @@ const fetchComments = async () => {
   const articleId = route.params.id;
   try {
     const response = await axios.get(
-      `http://localhost:8080/api/comments/article/${articleId}`
+      `/api/comments/article/${articleId}`
     );
     comments.value = response.data;
   } catch (error) {
@@ -130,7 +193,7 @@ const submitComment: () => Promise<void> = async () => {
   try {
     console.log("正在发送评论...", payload);
     const res = await axios.post(
-      "http://localhost:8080/api/comments/save",
+      "/api/comments/save",
       payload
     );
 
@@ -185,7 +248,7 @@ const confirmDelete = async () => {
 
   try {
     await axios.delete(
-      `http://localhost:8080/api/comments/${commentIdToDelete.value}`
+      `/api/comments/${commentIdToDelete.value}`
     );
     // 删除成功后
     showDeleteModal.value = false;
@@ -231,17 +294,45 @@ const confirmDelete = async () => {
         />
       </div>
 
-      <div class="mt-10 bg-slate-900/40 border border-white/10 p-8 rounded-[2.5rem] text-center backdrop-blur-xl">
+      <div class="mt-20 pt-10 border-t border-white/10 flex flex-col items-center justify-center gap-4">
+          <button 
+            @click="handleLike"
+            :class="['group relative flex flex-col items-center justify-center w-24 h-24 rounded-full border-4 transition-all duration-300', 
+              hasLiked ? 'bg-red-500 border-red-500 shadow-xl shadow-red-500/30 scale-110' : 'bg-slate-800 border-slate-700 hover:border-red-500 hover:bg-slate-700']"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" :class="['h-10 w-10 transition-colors', hasLiked ? 'text-white' : 'text-slate-400 group-hover:text-red-500']" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd" />
+            </svg>
+            <span v-if="hasLiked" class="absolute mt-16 text-xs font-bold text-white-500 animate-bounce">已赞</span>
+          </button>
+          <p class="text-slate-500 text-sm">{{ hasLiked ? '再点一次取消点赞' : '如果是好文章，就点个赞吧' }}</p>
+
+          <div v-if="isAdmin" class="mt-12 w-full max-w-md mx-auto">
             <button 
-              @click="handleLike"
-              :class="['w-20 h-20 rounded-full flex items-center justify-center text-3xl transition-all mb-4 mx-auto border-2', 
-                hasLiked ? 'bg-red-500 border-red-400 text-white scale-110 shadow-lg shadow-red-500/20' : 'bg-white/5 border-white/10 text-slate-500 hover:border-red-500/50 hover:text-red-500']"
+              @click="showLikesList = !showLikesList"
+              class="w-full flex items-center justify-between px-6 py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-slate-300 font-bold transition-all"
             >
-              ❤️
+              <span class="flex items-center gap-2">
+                <span class="text-blue-400">📊</span> 后台记录：点赞明细 ({{ likesList.length }})
+              </span>
+              <span :class="{'rotate-180': showLikesList}" class="transition-transform duration-300">▼</span>
             </button>
-            <p class="text-white font-black text-lg">{{ article.likeCount }}</p>
-            <p class="text-slate-500 text-[10px] font-bold uppercase mt-1">给作品点个赞</p>
+            
+            <Transition name="fade">
+              <div v-if="showLikesList" class="mt-2 bg-slate-900/50 border border-white/5 rounded-2xl overflow-hidden max-h-60 overflow-y-auto custom-scrollbar">
+                <div v-if="likesList.length === 0" class="p-6 text-center text-slate-500 text-sm">
+                  暂无点赞记录
+                </div>
+                <ul v-else class="divide-y divide-white/5">
+                  <li v-for="like in likesList" :key="like.id" class="px-6 py-4 flex items-center justify-between hover:bg-white/5 transition-colors">
+                    <span class="text-white font-bold text-sm">{{ like.username }}</span>
+                    <span class="text-slate-500 text-xs">{{ formatDateTime(like.createdAt) }}</span>
+                  </li>
+                </ul>
+              </div>
+            </Transition>
           </div>
+        </div>
 
       <footer class="mt-12 flex justify-center">
         <button
@@ -391,11 +482,37 @@ const confirmDelete = async () => {
             v-if="comments.length === 0"
             class="py-20 text-center"
           >
-            <p class="text-slate-500 text-sm">还没有评论，快来抢沙发吧～</p>
+            <p class="text-slate-500 text-sm">还没有评论哦</p>
           </div>
         </div>
       </section>
       <Teleport to="body">
+        <Transition name="fade">
+        <div v-if="showMessageModal" class="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none p-6">
+          <div 
+            class="bg-slate-900/90 backdrop-blur-2xl border p-8 rounded-[2.5rem] shadow-2xl text-center scale-in-center pointer-events-auto"
+            :class="{
+              'border-amber-500/30': messageConfig.type === 'warning',
+              'border-red-500/30': messageConfig.type === 'error',
+              'border-emerald-500/30': messageConfig.type === 'success'
+            }"
+          >
+            <div 
+              class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl border"
+              :class="{
+                'bg-amber-500/10 text-amber-500 border-amber-500/20': messageConfig.type === 'warning',
+                'bg-red-500/10 text-red-500 border-red-500/20': messageConfig.type === 'error',
+                'bg-emerald-500/10 text-emerald-500 border-emerald-500/20': messageConfig.type === 'success'
+              }"
+            >
+              {{ messageConfig.type === 'warning' ? '⚠️' : (messageConfig.type === 'error' ? '❌' : '✨') }}
+            </div>
+            
+            <h3 class="text-xl font-black text-white">{{ messageConfig.title }}</h3>
+            <p class="text-slate-400 text-sm mt-2">{{ messageConfig.content }}</p>
+          </div>
+        </div>
+      </Transition>
         <Transition name="fade">
           <div
             v-if="showDeleteModal"

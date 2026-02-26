@@ -4,6 +4,20 @@ import { useRouter } from "vue-router";
 
 const router = useRouter();
 const articles = ref<any[]>([]);
+const showMessageModal = ref(false);
+const messageConfig = ref({
+  type: 'warning', // 'warning', 'error', 'success'
+  title: '提示',
+  content: ''
+});
+
+const showMessage = (type: 'warning' | 'error' | 'success', title: string, content: string) => {
+  messageConfig.value = { type, title, content };
+  showMessageModal.value = true;
+  setTimeout(() => {
+    showMessageModal.value = false;
+  }, 2000); // 2秒后自动关闭
+};
 
 // 暂时通过 localStorage 判断角色，等做完登录，这里会自动生效
 const userRole = ref(localStorage.getItem("user_role") || "GUEST");
@@ -14,7 +28,7 @@ const isAdmin = computed(() => userRole.value === "ROLE_ADMIN");
 // 从后端获取文章列表
 const fetchArticles = async () => {
   try {
-    const response = await fetch("http://localhost:8080/api/articles");
+    const response = await fetch("/api/articles");
     articles.value = await response.json();
   } catch (error) {
     console.error("加载文章失败:", error);
@@ -25,7 +39,7 @@ const fetchArticles = async () => {
 const deleteArticle = async (id: number) => {
   // 前端权限第一层拦截
   if (!isAdmin.value) {
-    alert("🔒 权限不足：仅管理员可进行删除操作");
+    showMessage('warning', '权限不足', '仅管理员可进行删除操作');
     return;
   }
 
@@ -34,7 +48,7 @@ const deleteArticle = async (id: number) => {
     return;
 
   try {
-    const response = await fetch(`http://localhost:8080/api/articles/${id}`, {
+    const response = await fetch(`/api/articles/${id}`, {
       method: "DELETE",
       // 之后登录成功后，这里要带上 Token
       headers: {
@@ -44,7 +58,7 @@ const deleteArticle = async (id: number) => {
 
     // 2. 后端返回 403 时的处理
     if (response.status === 403 || response.status === 401) {
-      alert("⚠️ 您的会话已过期或权限不足，请重新以管理员身份登录。");
+      showMessage('warning', '请重新登录', '您的会话已过期或权限不足');
       return;
     }
 
@@ -52,11 +66,11 @@ const deleteArticle = async (id: number) => {
       // 成功后，无需刷新页面，直接从本地数组中过滤掉该文章，实现“即时消失”效果
       articles.value = articles.value.filter((article) => article.id !== id);
     } else {
-      alert("删除失败，服务器响应异常");
+      showMessage('warning', '删除失败', '服务器响应异常');
     }
   } catch (error) {
     console.error("删除请求出错:", error);
-    alert("服务器开小差了，请稍后再试");
+    showMessage('warning', '删除失败', '删除请求出错');
   }
 };
 
@@ -180,5 +194,33 @@ const goToDetail = (id: number) => {
         </div>
       </div>
     </div>
+    <Teleport to="body">
+      <Transition name="fade">
+        <div v-if="showMessageModal" class="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none p-6">
+          <div 
+            class="bg-slate-900/90 backdrop-blur-2xl border p-8 rounded-[2.5rem] shadow-2xl text-center scale-in-center pointer-events-auto"
+            :class="{
+              'border-amber-500/30': messageConfig.type === 'warning',
+              'border-red-500/30': messageConfig.type === 'error',
+              'border-emerald-500/30': messageConfig.type === 'success'
+            }"
+          >
+            <div 
+              class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl border"
+              :class="{
+                'bg-amber-500/10 text-amber-500 border-amber-500/20': messageConfig.type === 'warning',
+                'bg-red-500/10 text-red-500 border-red-500/20': messageConfig.type === 'error',
+                'bg-emerald-500/10 text-emerald-500 border-emerald-500/20': messageConfig.type === 'success'
+              }"
+            >
+              {{ messageConfig.type === 'warning' ? '⚠️' : (messageConfig.type === 'error' ? '❌' : '✨') }}
+            </div>
+            
+            <h3 class="text-xl font-black text-white">{{ messageConfig.title }}</h3>
+            <p class="text-slate-400 text-sm mt-2">{{ messageConfig.content }}</p>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>

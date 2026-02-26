@@ -36,48 +36,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String username = jwtUtils.extractUsername(token);
                 String role = jwtUtils.extractRole(token);
 
-                // 在 JwtAuthenticationFilter 中
-                if (role != null) {
-                    // 确保这里的 role 是 "ROLE_ADMIN"，而不是 "ADMIN"
-                    // 如果数据库存的是 "ADMIN"，这里要写成: "ROLE_" + role
-                    String authorityRole = role.startsWith("ROLE_") ? role : "ROLE_" + role;
+                // 4. 只有当用户名存在且当前上下文未认证时，才进行认证设置
+                if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+
+                    // 核心修复：确保 role 带有 "ROLE_" 前缀，完美适配 Spring Security 的 hasRole 语法
+                    String authorityRole = (role != null && role.startsWith("ROLE_")) ? role : "ROLE_" + role;
                     SimpleGrantedAuthority authority = new SimpleGrantedAuthority(authorityRole);
 
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             username, null, Collections.singletonList(authority));
+
+                    // 5. 正式存入安全上下文
                     SecurityContextHolder.getContext().setAuthentication(authToken);
-                }
 
-                // 在 JwtAuthenticationFilter.java 的 doFilterInternal 中
-                if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    // 打印一下，看看解析出来的用户名和角色对不对
-                    System.out.println("JWT 解析成功 - 用户: " + username + ", 角色: " + role);
-
-                    SimpleGrantedAuthority authority = new SimpleGrantedAuthority(role);
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            username, null, Collections.singletonList(authority));
-
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
-                }
-
-                if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    // 4. 将角色封装成 Spring Security 认得的 Authority (注意：必须加 ROLE_ 前缀)
-                    SimpleGrantedAuthority authority = new SimpleGrantedAuthority(role);
-
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            username, null, Collections.singletonList(authority));
-
-                    // 5. 正式存入安全上下文，告诉后面所有的过滤器：“这个人通过了，他是管理员/用户”
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                    // 打印日志，方便线上排查
+                    System.out.println("JWT 解析成功 - 用户: " + username + ", 授权角色: " + authorityRole);
                 }
             } catch (Exception e) {
-                // Token 无效或过期，这里可以选择记录日志，或者直接放行（让后面的鉴权挡住）
+                // Token 无效或过期，记录错误并放行，由后续的 Security 配置拦截
                 logger.error("JWT 验证失败: " + e.getMessage());
             }
         }
 
-
-        // 6. 继续执行后面的过滤器链
+        // 6. 无论是否有 Token，最后都必须继续执行过滤器链
         filterChain.doFilter(request, response);
     }
 }

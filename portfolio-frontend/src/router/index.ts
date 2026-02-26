@@ -9,7 +9,6 @@ import ArticleDetailView from '../views/ArticleDetailView.vue'
 import LoginView from '../views/LoginView.vue'
 import ProjectListView from '../views/ProjectListView.vue' 
 import ProjectUploadView from '../views/ProjectUploadView.vue'
-import ProjectDetailView from '../views/ProjectDetailView.vue'
 
 
 const routes = [

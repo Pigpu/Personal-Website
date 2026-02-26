@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 const service = axios.create({
-  baseURL: 'http://localhost:8080'
+  baseURL: 'https://shimizukaede.top/api'
 });
 
 service.interceptors.request.use(config => {

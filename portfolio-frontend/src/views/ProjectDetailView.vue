@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 
@@ -7,26 +7,76 @@ const route = useRoute();
 const router = useRouter();
 const project = ref<any>(null);
 const hasLiked = ref(false);
+const likesList = ref<any[]>([]);
+const showLikesList = ref(false);
+
+const isLoggedIn = computed(() => !!localStorage.getItem('token'));
+const isAdmin = computed(() => localStorage.getItem('user_role') === 'ROLE_ADMIN');
+
+const showMessageModal = ref(false);
+const messageConfig = ref({ type: 'warning', title: '提示', content: '' });
+
+const showMessage = (type: 'warning' | 'error' | 'success', title: string, content: string) => {
+  messageConfig.value = { type, title, content };
+  showMessageModal.value = true;
+  setTimeout(() => showMessageModal.value = false, 2000);
+};
 
 const fetchProjectDetail = async () => {
   try {
-    // 1. 获取详情 (后端会自动增加 viewCount)
-    const res = await axios.get(`http://localhost:8080/api/projects/${route.params.id}`);
+    const res = await axios.get(`/api/projects/${route.params.id}`);
     project.value = res.data;
+
+    // 获取后加载点赞状态
+    if (isLoggedIn.value) checkLikeStatus();
+    if (isAdmin.value) fetchLikesList();
+
   } catch (error) {
     console.error("加载作品失败", error);
     router.push('/projects');
   }
 };
 
-const handleLike = async () => {
-  if (hasLiked.value) return;
+const checkLikeStatus = async () => {
   try {
-    const res = await axios.post(`http://localhost:8080/api/projects/${project.value.id}/like`);
-    project.value.likeCount = res.data; // 后端返回最新的点赞数
-    hasLiked.value = true;
+    const res = await axios.get(`/api/projects/${route.params.id}/like-status`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    });
+    hasLiked.value = res.data;
   } catch (error) {
-    alert("点赞失败，请先登录");
+    console.error("获取点赞状态失败", error);
+  }
+};
+
+const fetchLikesList = async () => {
+  try {
+    const res = await axios.get(`/api/projects/${route.params.id}/likes-list`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    });
+    likesList.value = res.data;
+  } catch (error) {
+    console.error("获取点赞列表失败", error);
+  }
+};
+
+const handleLike = async () => {
+  if (!isLoggedIn.value) {
+    showMessage('warning', '需要登录', '请先登录才能为作品点赞哦~');
+    return;
+  }
+  
+  try {
+    const res = await axios.post(`/api/projects/${project.value.id}/like`, {}, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    });
+    
+    project.value.likeCount = res.data.likeCount;
+    hasLiked.value = res.data.isLiked;
+    
+    if (isAdmin.value) fetchLikesList();
+  } catch (error) {
+    console.error("点赞操作失败", error);
+    showMessage('error', '操作失败', '点赞失败，请检查网络或重新登录后重试');
   }
 };
 
@@ -47,6 +97,8 @@ const formatDate = (dateStr: string) => {
   const date = new Date(dateStr);
   return date.toLocaleDateString();
 };
+
+const formatDateTime = (dateStr: string) => new Date(dateStr).toLocaleString();
 
 onMounted(fetchProjectDetail);
 </script>
@@ -83,7 +135,7 @@ video::-webkit-media-controls-enclosure {
         </div>
       </div>
 
-      <div class="relative w-full rounded-[3rem] overflow-hidden shadow-2xl border border-white/5 aspect-video mb-10 flex items-center justify-center">
+      <div class="relative w-full bg-black rounded-[3rem] overflow-hidden shadow-2xl border border-white/5 aspect-video mb-10 flex items-center justify-center">
         
         <video 
           v-if="project.mediaType === 'VIDEO'"
@@ -117,16 +169,19 @@ video::-webkit-media-controls-enclosure {
         </div>
 
         <div class="space-y-6">
-          <div class="bg-slate-900/40 border border-white/10 p-8 rounded-[2.5rem] text-center backdrop-blur-xl">
+          
+          <div class="bg-slate-900/40 border border-white/10 p-8 rounded-[2.5rem] text-center backdrop-blur-xl transition-all">
             <button 
               @click="handleLike"
-              :class="['w-20 h-20 rounded-full flex items-center justify-center text-3xl transition-all mb-4 mx-auto border-2', 
-                hasLiked ? 'bg-red-500 border-red-400 text-white scale-110 shadow-lg shadow-red-500/20' : 'bg-white/5 border-white/10 text-slate-500 hover:border-red-500/50 hover:text-red-500']"
+              :class="['w-20 h-20 rounded-full flex items-center justify-center text-3xl transition-all mb-4 mx-auto border-4', 
+                hasLiked ? 'bg-red-500 border-red-500 shadow-xl shadow-red-500/40 scale-110' : 'bg-white/5 border-white/10 text-slate-500 hover:border-red-500/50 hover:text-red-500']"
             >
               ❤️
             </button>
-            <p class="text-white font-black text-lg">{{ project.likeCount }}</p>
-            <p class="text-slate-500 text-[10px] font-bold uppercase mt-1">给作品点个赞</p>
+            <p class="text-white font-black text-2xl">{{ project.likeCount }}</p>
+            <p class="text-slate-500 text-[10px] font-bold uppercase mt-2">
+              {{ hasLiked ? '再点一次取消点赞' : '给作品点个赞' }}
+            </p>
           </div>
 
           <div v-if="project.attachmentUrl" class="bg-blue-500/10 border border-blue-500/20 p-8 rounded-[2.5rem] backdrop-blur-xl">
@@ -138,11 +193,62 @@ video::-webkit-media-controls-enclosure {
               class="w-full py-4 bg-blue-500 hover:bg-blue-600 text-white font-black rounded-2xl transition-all shadow-xl shadow-blue-500/20 active:scale-95 flex items-center justify-center gap-2"
             >
               <span>立即下载</span>
-              <span class="text-xs opacity-50">({{ getFileName(project.attachmentUrl) }})</span>
+              <span class="text-xs opacity-50 truncate max-w-[100px]">({{ getFileName(project.attachmentUrl) }})</span>
             </button>
+          </div>
+
+          <div v-if="isAdmin" class="mt-6">
+            <button 
+              @click="showLikesList = !showLikesList"
+              class="w-full flex items-center justify-between px-6 py-4 bg-slate-900/60 hover:bg-slate-800 border border-white/10 rounded-2xl text-slate-300 font-bold transition-all"
+            >
+              <span class="flex items-center gap-2 text-sm">
+                <span class="text-blue-400">📊</span> 点赞明细 ({{ likesList.length }})
+              </span>
+              <span :class="{'rotate-180': showLikesList}" class="transition-transform duration-300 text-[10px]">▼</span>
+            </button>
+            
+            <Transition name="fade">
+              <div v-if="showLikesList" class="mt-2 bg-slate-900/80 border border-white/5 rounded-2xl overflow-hidden max-h-60 overflow-y-auto custom-scrollbar">
+                <div v-if="likesList.length === 0" class="p-6 text-center text-slate-500 text-sm">暂无点赞记录</div>
+                <ul v-else class="divide-y divide-white/5">
+                  <li v-for="like in likesList" :key="like.id" class="px-5 py-3 flex flex-col hover:bg-white/5 transition-colors">
+                    <span class="text-white font-bold text-sm">{{ like.username }}</span>
+                    <span class="text-slate-500 text-[10px]">{{ formatDateTime(like.createdAt) }}</span>
+                  </li>
+                </ul>
+              </div>
+            </Transition>
           </div>
         </div>
       </div>
     </div>
+    <Teleport to="body">
+      <Transition name="fade">
+        <div v-if="showMessageModal" class="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none p-6">
+          <div 
+            class="bg-slate-900/90 backdrop-blur-2xl border p-8 rounded-[2.5rem] shadow-2xl text-center scale-in-center pointer-events-auto"
+            :class="{
+              'border-amber-500/30': messageConfig.type === 'warning',
+              'border-red-500/30': messageConfig.type === 'error',
+              'border-emerald-500/30': messageConfig.type === 'success'
+            }"
+          >
+            <div 
+              class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl border"
+              :class="{
+                'bg-amber-500/10 text-amber-500 border-amber-500/20': messageConfig.type === 'warning',
+                'bg-red-500/10 text-red-500 border-red-500/20': messageConfig.type === 'error',
+                'bg-emerald-500/10 text-emerald-500 border-emerald-500/20': messageConfig.type === 'success'
+              }"
+            >
+              {{ messageConfig.type === 'warning' ? '⚠️' : (messageConfig.type === 'error' ? '❌' : '✨') }}
+            </div>
+            <h3 class="text-xl font-black text-white">{{ messageConfig.title }}</h3>
+            <p class="text-slate-400 text-sm mt-2">{{ messageConfig.content }}</p>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>

@@ -54,7 +54,7 @@ watch(
 const loadData = async () => {
   if (isEditMode.value) {
     try {
-      const res = await axios.get(`http://localhost:8080/api/articles/${route.query.id}`);
+      const res = await axios.get(`/api/articles/${route.query.id}`);
       title.value = res.data.title;
       content.value = res.data.content;
       category.value = res.data.category;
@@ -95,7 +95,7 @@ const closeDropdown = (e: Event) => {
 };
 
 // --- 4. 路由守卫 ---
-onBeforeRouteLeave((to, from, next) => {
+onBeforeRouteLeave((to, _from, next) => {
   if (isSubmitting.value || forceLeave.value) {
     next();
     return;
@@ -137,7 +137,7 @@ const onUploadImg = async (files: File[], callback: (urls: string[]) => void) =>
         const form = new FormData();
         form.append("image", file);
         const token = localStorage.getItem('token');
-        fetch("http://localhost:8080/api/upload", {
+        fetch("/api/upload", {
           method: "POST",
           body: form,
           headers: { 'Authorization': token ? `Bearer ${token}` : '' },
@@ -170,9 +170,9 @@ const saveArticle = async () => {
   try {
     let res;
     if (isEditMode.value) {
-      res = await axios.put(`http://localhost:8080/api/articles/${route.query.id}`, articleData);
+      res = await axios.put(`/api/articles/${route.query.id}`, articleData);
     } else {
-      res = await axios.post("http://localhost:8080/api/articles", articleData);
+      res = await axios.post("/api/articles", articleData);
     }
 
     if (res.status === 200 || res.status === 201) {

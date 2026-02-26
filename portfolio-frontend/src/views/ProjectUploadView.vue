@@ -40,7 +40,7 @@ const loadProjectData = async () => {
 
   try {
     const res = await axios.get(
-      `http://localhost:8080/api/projects/${route.query.id}`
+      `/api/projects/${route.query.id}`
     );
     const data = res.data;
 
@@ -84,7 +84,7 @@ const isModified = computed(() => {
   );
 });
 
-onBeforeRouteLeave((to, from, next) => {
+onBeforeRouteLeave((to, _from, next) => {
   if (isSubmitting.value || forceLeave.value) {
     next();
     return;
@@ -140,7 +140,7 @@ const uplaodFile = async (
   formData.append("type", role);
   try {
     const res = await axios.post(
-      "http://localhost:8080/api/upload/project",
+      "/api/upload/project",
       formData,
       {
         onUploadProgress: (progressEvent: any) => {
@@ -172,12 +172,12 @@ const submitProject = async () => {
     if (isEditMode.value) {
       // 编辑模式：PUT 请求
       res = await axios.put(
-        `http://localhost:8080/api/projects/${route.query.id}`,
+        `/api/projects/${route.query.id}`,
         form
       );
     } else {
       // 新增模式：POST 请求
-      res = await axios.post("http://localhost:8080/api/projects/save", form);
+      res = await axios.post("/api/projects/save", form);
     }
 
     if (res.status === 200 || res.status === 201) {

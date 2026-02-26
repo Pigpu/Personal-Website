@@ -1,6 +1,8 @@
 package com.kaede.portfoliobackend.controller; // ⚠️ 确认你的包名是否正确
 
 import com.kaede.portfoliobackend.entity.Article;
+import com.kaede.portfoliobackend.entity.ArticleLike;
+import com.kaede.portfoliobackend.repository.ArticleLikeRepository;
 import com.kaede.portfoliobackend.repository.ArticleRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -8,14 +10,17 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/articles")
-@CrossOrigin(origins = "http://localhost:5173") // 允许前端跨域
+@RequestMapping("/api/articles")// 允许前端跨域
 public class ArticleController {
 
     @Autowired
     private ArticleRepository articleRepository;
+
+    @Autowired
+    private ArticleLikeRepository articleLikeRepository;
 
     // 1. 获取所有文章 (按时间倒序)
     @GetMapping
@@ -68,13 +73,60 @@ public class ArticleController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
-    // 6. 点赞文章 (互动力)
+    /// 1. 点赞/取消点赞 (Toggle逻辑)
     @PostMapping("/{id}/like")
-    public ResponseEntity<?> likeArticle(@PathVariable Long id) {
+    public ResponseEntity<?> toggleLike(@PathVariable Long id, org.springframework.security.core.Authentication authentication) {
+        if (authentication == null || authentication.getName().equals("anonymousUser")) {
+            return ResponseEntity.status(401).body("请先登录");
+        }
+
+        String username = authentication.getName(); // 获取当前登录用户名
+
         return articleRepository.findById(id).map(article -> {
-            article.setLikeCount(article.getLikeCount() + 1);
+            // 检查是否已经点过赞
+            Optional<ArticleLike> existingLike = articleLikeRepository.findByArticleIdAndUsername(id, username);
+
+            boolean isLikedNow;
+            if (existingLike.isPresent()) {
+                // 如果点过赞 -> 取消点赞
+                articleLikeRepository.delete(existingLike.get());
+                article.setLikeCount(Math.max(0, article.getLikeCount() - 1));
+                isLikedNow = false;
+            } else {
+                // 如果没点过 -> 新增点赞
+                ArticleLike newLike = new ArticleLike();
+                newLike.setArticleId(id);
+                newLike.setUsername(username);
+                newLike.setCreatedAt(LocalDateTime.now());
+                articleLikeRepository.save(newLike);
+
+                article.setLikeCount(article.getLikeCount() + 1);
+                isLikedNow = true;
+            }
+
             articleRepository.save(article);
-            return ResponseEntity.ok(article.getLikeCount()); // 返回最新的点赞数
+
+            // 返回最新状态给前端
+            return ResponseEntity.ok(java.util.Map.of(
+                    "likeCount", article.getLikeCount(),
+                    "isLiked", isLikedNow
+            ));
         }).orElse(ResponseEntity.notFound().build());
+    }
+
+    // 2. 获取当前用户的点赞状态 (前端初始化用)
+    @GetMapping("/{id}/like-status")
+    public ResponseEntity<Boolean> getLikeStatus(@PathVariable Long id, org.springframework.security.core.Authentication authentication) {
+        if (authentication == null || authentication.getName().equals("anonymousUser")) {
+            return ResponseEntity.ok(false);
+        }
+        boolean hasLiked = articleLikeRepository.findByArticleIdAndUsername(id, authentication.getName()).isPresent();
+        return ResponseEntity.ok(hasLiked);
+    }
+
+    // 3. 获取点赞列表 (管理员专用)
+    @GetMapping("/{id}/likes-list")
+    public ResponseEntity<List<ArticleLike>> getLikesList(@PathVariable Long id) {
+        return ResponseEntity.ok(articleLikeRepository.findByArticleIdOrderByCreatedAtDesc(id));
     }
 }

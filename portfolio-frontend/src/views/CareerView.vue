@@ -48,7 +48,7 @@ const removeTag = (index: number) => {
 };
 
 const fetchCareers = async () => {
-  const res = await axios.get("http://localhost:8080/api/career/list");
+  const res = await axios.get("/api/career/list");
   careerList.value = res.data;
 };
 
@@ -64,7 +64,7 @@ const submitForm = async () => {
     tags: form.value.tagsList.join(","), // 数组转回逗号隔开的字符串
   };
 
-  await axios.post("http://localhost:8080/api/career/save", payload);
+  await axios.post("/api/career/save", payload);
   closeModal();
   fetchCareers();
 };
@@ -126,7 +126,7 @@ const openDeleteModal = (id: number | undefined) => {
 const confirmDelete = async () => {
   if (itemToDelete.value !== null) {
     await axios.delete(
-      `http://localhost:8080/api/career/delete/${itemToDelete.value}`
+      `/api/career/delete/${itemToDelete.value}`
     );
     showDeleteModal.value = false;
     itemToDelete.value = null;

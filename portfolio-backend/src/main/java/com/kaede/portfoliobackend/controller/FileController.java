@@ -1,5 +1,6 @@
 package com.kaede.portfoliobackend.controller;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -7,15 +8,16 @@ import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
 
-@CrossOrigin(origins = "http://localhost:5173")
 @RestController
 @RequestMapping("/api")
 public class FileController {
 
     // 基础路径：保持你原来的设置不变
-    private final String BASE_UPLOAD_PATH = "D:/HomePageProject/HomepageDB/uploads/";
+    @Value("${upload.path}")
+    private String BASE_UPLOAD_PATH;
     // 基础 URL：用于拼接返回给前端的访问地址
-    private final String BASE_URL = "http://localhost:8080/uploads/";
+    @Value("${upload.base-url}")
+    private String BASE_URL;
 
     /**
      * 原有接口：保持不变 (供文章编辑器使用)

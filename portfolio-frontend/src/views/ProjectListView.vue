@@ -9,7 +9,7 @@ const userRole = localStorage.getItem("user_role");
 
 const fetchProjects = async () => {
   try {
-    const res = await axios.get(`http://localhost:8080/api/projects`, {
+    const res = await axios.get(`/api/projects`, {
       params: { sort: currentSort.value },
     });
     projects.value = res.data;
@@ -23,7 +23,7 @@ const handleSearch = async () => {
     fetchProjects();
     return;
   }
-  const res = await axios.get(`http://localhost:8080/api/projects/search`, {
+  const res = await axios.get(`/api/projects/search`, {
     params: { keyword: searchKeyword.value },
   });
   projects.value = res.data;
@@ -31,7 +31,7 @@ const handleSearch = async () => {
 
 const handleDelete = async (id: number) => {
   if (!confirm("确定删除该作品吗？")) return;
-  await axios.delete(`http://localhost:8080/api/projects/${id}`);
+  await axios.delete(`/api/projects/${id}`);
   fetchProjects();
 };
 

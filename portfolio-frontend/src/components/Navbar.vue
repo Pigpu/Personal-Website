@@ -1,12 +1,28 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from "vue-router";
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
+import { useI18n } from 'vue-i18n'
 
+const { t, locale } = useI18n()
 const route = useRoute();
 const router = useRouter();
 const username = ref<string | null>(null);
 const showLogoutModal = ref(false);
 const showGoodbyeModal = ref(false);
+
+// 切换语言的函数
+const changeLang = (lang: 'zh' | 'en' | 'ja') => {
+  locale.value = lang // 切换界面语言
+  localStorage.setItem('site_lang', lang) // 记住用户的选择
+}
+
+// 用于在按钮上显示当前语言
+const currentLangLabel = computed(() => {
+  if (locale.value === 'zh') return '中'
+  if (locale.value === 'en') return 'EN'
+  if (locale.value === 'ja') return '日'
+  return '中'
+})
 
 // 初始化时获取登录状态
 onMounted(() => {
@@ -31,12 +47,12 @@ const handleLogout = () => {
   }, 1500);
 };
 
-// 定义导航链接
+// ✅ 修改点 1：将写死的中文换成 i18n 的字典 key
 const navLinks = [
-  { name: "主页", path: "/" },
-  { name: "生涯", path: "/career" },
-  { name: "生活", path: "/articles" },
-  { name: "作品", path: "/projects" }
+  { key: "nav.home", path: "/" },
+  { key: "nav.career", path: "/career" },
+  { key: "nav.articles", path: "/articles" },
+  { key: "nav.projects", path: "/projects" }
 ];
 </script>
 
@@ -58,7 +74,8 @@ const navLinks = [
           class="px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 relative group"
           :class="route.path === link.path ? 'text-white' : 'text-slate-400 hover:text-slate-200'"
         >
-          {{ link.name }}
+          {{ t(link.key) }}
+          
           <div
             v-if="route.path === link.path"
             class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-400 rounded-full shadow-[0_0_8px_#60a5fa]"
@@ -67,17 +84,37 @@ const navLinks = [
         </router-link>
       </div>
 
-      <div class="flex-1 flex justify-end gap-3 items-center">
-        <button class="p-2 text-slate-400 hover:text-white transition-colors">
-          <span class="text-s font-mono">EN/JP</span>
-        </button>
+      <div class="flex-1 flex justify-end gap-4 items-center">
+        
+        <div class="relative group z-50 flex items-center h-full">
+          <div class="px-2 py-2 rounded-full text-xs relative group text-slate-400">
+          Change language
+          </div>
+          <button class="flex items-center justify-center w-8 h-8 rounded-full bg-white/5 border border-white/10 text-slate-300 hover:text-white hover:bg-white/10 transition-all">
+            <span class="text-xs font-black">{{ currentLangLabel }}</span>
+          </button>
+          
+          <div class="absolute right-0 top-full pt-2 w-32 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 pointer-events-none group-hover:pointer-events-auto">
+            <div class="bg-slate-900/95 backdrop-blur-2xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl py-2 flex flex-col">
+              <button @click="changeLang('zh')" :class="['px-5 py-3 text-sm text-left hover:bg-white/10 transition-colors', locale === 'zh' ? 'text-blue-400 font-bold' : 'text-slate-300']">
+                🇨🇳 中文
+              </button>
+              <button @click="changeLang('en')" :class="['px-5 py-3 text-sm text-left hover:bg-white/10 transition-colors', locale === 'en' ? 'text-blue-400 font-bold' : 'text-slate-300']">
+                🇺🇸 English
+              </button>
+              <button @click="changeLang('ja')" :class="['px-5 py-3 text-sm text-left hover:bg-white/10 transition-colors', locale === 'ja' ? 'text-blue-400 font-bold' : 'text-slate-300']">
+                🇯🇵 日本語
+              </button>
+            </div>
+          </div>
+        </div>
 
         <router-link
           v-if="!username"
           to="/login"
           class="px-5 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold rounded-full transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)]"
         >
-          LOGIN
+          {{ t('nav.login') }}
         </router-link>
 
         <button
@@ -96,7 +133,7 @@ const navLinks = [
         <Transition name="fade">
           <div
             v-if="showLogoutModal"
-            class="fixed inset-0 z-100 flex items-center justify-center p-6"
+            class="fixed inset-0 z-[100] flex items-center justify-center p-6"
           >
             <div
               class="absolute inset-0 bg-slate-950/60 backdrop-blur-md"
@@ -121,7 +158,7 @@ const navLinks = [
                 </button>
                 <button
                   @click="showLogoutModal = false"
-                  class="w-full py-3 bg-white/5 hover:bg-white/10 text-slate-300 text-sm font-bold rounded-2xl transition-all"
+                  class="w-full py-3 bg-white/5 hover:bg-white/10 text-slate-300 text-sm font-bold rounded-2xl transition-all border border-white/5"
                 >
                   返回
                 </button>
@@ -132,7 +169,7 @@ const navLinks = [
         <Transition name="fade">
           <div
             v-if="showGoodbyeModal"
-            class="fixed inset-0 z-100 flex items-center justify-center p-6"
+            class="fixed inset-0 z-[100] flex items-center justify-center p-6"
           >
             <div class="absolute inset-0 bg-slate-950/60 backdrop-blur-md"></div>
 
@@ -154,13 +191,14 @@ const navLinks = [
   animation: scale-in-center 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
 }
 @keyframes scale-in-center {
-  0% {
-    transform: scale(0.9);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
+  0% { transform: scale(0.9); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
 }
 </style>
