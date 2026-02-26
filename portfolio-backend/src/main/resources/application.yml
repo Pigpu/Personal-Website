@@ -10,8 +10,6 @@ spring:
   web:
     resources:
       static-locations: file:D:/HomePageProject/HomepageDB/uploads/,classpath:/static/
-  upload:
-    path: "file:/www/wwwroot/portfolio/uploads/"
 
   # 数据库连接配置
   datasource:
@@ -33,3 +31,7 @@ spring:
 
 # 开启 Java 21 虚拟线程 (2026年项目的标配)
 spring.threads.virtual.enabled: true
+
+upload:
+  path: "file:D:/HomePageProject/HomepageDB/uploads/"
+  base-url: "http://localhost:8080/uploads/"
