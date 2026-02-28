@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from "vue";
 import axios from "axios";
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 
 const projects = ref<any[]>([]);
 const searchKeyword = ref("");
@@ -44,10 +46,10 @@ onMounted(fetchProjects);
     <div class="max-w-7xl mx-auto">
       <div class="flex justify-between items-center mb-6">
         <div class="text-left">
-          <h2 class="text-4xl font-black bg-linear-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
-            作品分享
+          <h2 class="text-4xl font-black bg-linear-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent pb-2 -mb-2">
+            {{ t('art.title') }}
           </h2>
-          <p class="text-slate-500 text-sm mt-1">基于兴趣爱好或专业知识造出来的一些小作品展示</p>
+          <p class="text-slate-400 text-sm mt-1">{{ t('art.subtitle') }}</p>
         </div>
       </div>
       <div class="flex flex-col md:flex-row gap-6 justify-between items-center mb-12">
@@ -56,7 +58,7 @@ onMounted(fetchProjects);
             v-model="searchKeyword"
             @input="handleSearch"
             type="text"
-            placeholder="搜索作品标题或描述..."
+            :placeholder="t('art.search')"
             class="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-12 text-white focus:border-blue-500/50 focus:ring-0 transition-all"
           />
           <span class="absolute left-4 top-3.5 text-slate-500">🔍</span>
@@ -66,11 +68,11 @@ onMounted(fetchProjects);
           <button
             @click="currentSort = 'latest'"
             :class="['px-6 py-2 rounded-xl text-sm font-bold transition-all', currentSort === 'latest' ? 'bg-blue-500 text-white shadow-lg' : 'text-slate-400 hover:text-white']"
-          >最新发布</button>
+          >{{ t('art.mostR') }}</button>
           <button
             @click="currentSort = 'likes'"
             :class="['px-6 py-2 rounded-xl text-sm font-bold transition-all', currentSort === 'likes' ? 'bg-blue-500 text-white shadow-lg' : 'text-slate-400 hover:text-white']"
-          >最多点赞</button>
+          >{{ t('art.mostS') }}</button>
         </div>
       </div>
 
@@ -81,7 +83,7 @@ onMounted(fetchProjects);
           class="group border-2 border-dashed border-white/10 rounded-[2.5rem] flex flex-col items-center justify-center p-10 hover:border-blue-500/50 hover:bg-blue-500/5 transition-all min-h-[400px]"
         >
           <div class="w-16 h-16 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center text-3xl mb-4 group-hover:scale-110 transition-transform">+</div>
-          <span class="text-slate-400 font-bold">发布新作品</span>
+          <span class="text-slate-400 font-bold">{{ t('art.new') }}</span>
         </router-link>
 
         <div
@@ -157,7 +159,7 @@ onMounted(fetchProjects);
               <router-link
                 :to="`/projects/${project.id}`"
                 class="text-xs font-black text-blue-400 hover:text-blue-300 uppercase"
-              >查看详情 →</router-link>
+              >{{ t('art.detail') }}</router-link>
             </div>
           </div>
         </div>

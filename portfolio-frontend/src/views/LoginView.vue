@@ -2,6 +2,8 @@
 import { ref, watch } from "vue";
 import axios from "axios";
 //import { useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
+const { t } = useI18n();
 
 //const router = useRouter();
 const isLogin = ref(true); // 切换登录/注册状态
@@ -14,7 +16,7 @@ const messageConfig = ref({
   title: '提示',
   content: ''
 });
-const errmes = ref('1');
+const errmes = ref(t('login.errDefault'));
 
 const showMessage = (type: 'warning' | 'error' | 'success', title: string, content: string) => {
   messageConfig.value = { type, title, content };
@@ -57,7 +59,7 @@ watch(isLogin, (newVal) => {
 const handleSubmit = async () => {
   // 注册模式下的前端校验
   if (!isLogin.value && !form.value.captcha) {
-    alert("请输入验证码");
+    showMessage('warning', t('login.captcha'), t('login.msgInputCaptcha')); 
     return;
   }
 
@@ -100,12 +102,14 @@ const handleSubmit = async () => {
     }
   } catch (error: any) {
     if(error.response?.data=='用户名已存在'){
-      errmes.value = '请直接登录或更换用户名'
+      errmes.value = t('login.errUsernameExistDesc')
     }
     if(error.response?.data=='验证码错误'){
-      errmes.value = '请重试'
+      errmes.value = t('login.errRetry')
     }
-    showMessage('warning', error.response?.data, errmes.value);
+    const errorTitle = error.response?.data === '用户名已存在' ? t('login.errUsernameExist') : 
+                      (error.response?.data === '验证码错误' ? t('login.errCaptcha') : t('login.errDefault'));
+    showMessage('warning', errorTitle, errmes.value);
     // 注册失败（如验证码错误/用户名重复），自动刷新验证码供用户重试
     if (!isLogin.value) {
       fetchCaptcha();
@@ -120,10 +124,10 @@ const handleSubmit = async () => {
     <div class="w-full max-w-md bg-slate-900/40 backdrop-blur-xl border border-white/10 p-10 rounded-[2.5rem] shadow-2xl transition-all duration-300">
       <div class="text-center mb-10">
         <h2 class="text-3xl font-bold bg-linear-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
-          {{ isLogin ? '欢迎回来' : '用户注册的' }}
+          {{ isLogin ? t('login.titleLogin') : t('login.titleRegister') }}
         </h2>
         <p class="text-slate-400 mt-2 text-sm">
-          {{ isLogin ? '登录以管理你的生涯与生活' : '注册后就可以和我互动哦' }}
+          {{ isLogin ? t('login.descLogin') : t('login.descRegister') }}
         </p>
       </div>
 
@@ -138,7 +142,7 @@ const handleSubmit = async () => {
             type="text"
             required
             class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-blue-500 transition-all"
-            placeholder="输入用户名"
+            :placeholder="t('login.placeholderUser')"
           />
         </div>
 
@@ -149,7 +153,7 @@ const handleSubmit = async () => {
             type="password"
             required
             class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-blue-500 transition-all"
-            placeholder="••••••••"
+            :placeholder="t('login.placeholderPwd')"
           />
         </div>
 
@@ -160,7 +164,7 @@ const handleSubmit = async () => {
               v-model="form.captcha" 
               type="text" 
               required
-              placeholder="请输入右侧验证码"
+              :placeholder="t('login.placeholderCaptcha')"
               maxlength="4"
               class="flex-1 bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 transition-all uppercase"
             />
@@ -171,10 +175,10 @@ const handleSubmit = async () => {
               title="点击刷新验证码"
             >
               <img v-if="captchaImg" :src="captchaImg" class="w-full h-full object-contain" />
-              <span v-else class="text-slate-500 text-xs animate-pulse">加载中...</span>
+              <span v-else class="text-slate-500 text-xs animate-pulse">{{ t('login.loading') }}</span>
               
               <div class="absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <span class="text-white text-xs font-bold">↻ 刷新</span>
+                <span class="text-white text-xs font-bold">↻ {{ t('login.btnRefresh') }}</span>
               </div>
             </div>
           </div>
@@ -184,30 +188,28 @@ const handleSubmit = async () => {
           type="submit"
           class="w-full py-4 bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold rounded-2xl shadow-lg shadow-blue-500/20 transition-all active:scale-95"
         >
-          {{ isLogin ? '立即登录' : '提交注册' }}
+          {{ isLogin ? t('login.btnLogin') : t('login.btnRegister') }}
         </button>
       </form>
 
       <div class="mt-8 text-center text-sm">
-        <span class="text-slate-500">{{ isLogin ? '还没有账号？' : '已有账号？' }}</span>
+        <span class="text-slate-500">{{ isLogin ? t('login.noAccount') : t('login.hasAccount') }}</span>
         <button
           @click="isLogin = !isLogin"
           class="ml-2 text-blue-400 hover:text-blue-300 font-bold underline underline-offset-4"
         >
-          {{ isLogin ? '点此注册' : '返回登录' }}
+          {{ isLogin ? t('login.toRegister') : t('login.toLogin') }}
         </button>
       </div>
     </div>
-  </div>
-
-  <Teleport to="body">
+    <Teleport to="body">
     <Transition name="fade">
       <div v-if="showSuccessModal" class="fixed inset-0 z-100 flex items-center justify-center p-6">
         <div class="absolute inset-0 bg-slate-950/60 backdrop-blur-md"></div>
         <div class="relative bg-slate-900/90 backdrop-blur-2xl border border-emerald-500/30 px-10 py-8 rounded-4xl shadow-2xl flex flex-col items-center scale-in-center">
           <div class="w-16 h-16 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center text-3xl mb-4 border border-emerald-500/30">✨</div>
-          <h3 class="text-2xl font-black text-white">欢迎回来</h3>
-          <p class="text-emerald-400/80 text-sm mt-2 font-bold">正在跳转首页...</p>
+          <h3 class="text-2xl font-black text-white">{{ t('login.successLoginTitle') }}</h3>
+          <p class="text-emerald-400/80 text-sm mt-2 font-bold">{{ t('login.successLoginDesc') }}</p>
         </div>
       </div>
     </Transition>
@@ -217,10 +219,10 @@ const handleSubmit = async () => {
     <Transition name="fade">
       <div v-if="showRegisterSuccessModal" class="fixed inset-0 z-100 flex items-center justify-center p-6">
         <div class="absolute inset-0 bg-slate-950/60 backdrop-blur-md"></div>
-        <div class="relative bg-slate-900/90 backdrop-blur-2xl border border-blue-500/30 px-10 py-8 rounded-[2rem] shadow-2xl flex flex-col items-center scale-in-center">
+        <div class="relative bg-slate-900/90 backdrop-blur-2xl border border-blue-500/30 px-10 py-8 rounded-4xl shadow-2xl flex flex-col items-center scale-in-center">
           <div class="w-16 h-16 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center text-3xl mb-4 border border-blue-500/30 animate-bounce">🎉</div>
-          <h3 class="text-2xl font-black text-white">注册成功！</h3>
-          <p class="text-blue-400/80 text-sm mt-2 font-bold">账号已创建，即将跳转登录...</p>
+          <h3 class="text-2xl font-black text-white">{{ t('login.successRegTitle') }}</h3>
+          <p class="text-blue-400/80 text-sm mt-2 font-bold">{{ t('login.successRegDesc') }}</p>
         </div>
       </div>
     </Transition>
@@ -228,7 +230,7 @@ const handleSubmit = async () => {
 
   <Teleport to="body">
       <Transition name="fade">
-        <div v-if="showMessageModal" class="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none p-6">
+        <div v-if="showMessageModal" class="fixed inset-0 z-100 flex items-center justify-center pointer-events-none p-6">
           <div 
             class="bg-slate-900/90 backdrop-blur-2xl border p-8 rounded-[2.5rem] shadow-2xl text-center scale-in-center pointer-events-auto"
             :class="{
@@ -254,6 +256,7 @@ const handleSubmit = async () => {
         </div>
       </Transition>
     </Teleport>
+  </div>
 </template>
 
 <style scoped>

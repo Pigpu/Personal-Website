@@ -6,7 +6,7 @@ import Navbar from './components/Navbar.vue' // 引入组件
 <template>
   <div class="relative min-h-screen text-slate-100 font-sans overflow-x-hidden">
     <div class="fixed inset-0 -z-20 bg-[url('/src/assets/bg.jpg')] bg-cover bg-center"></div>
-    <div class="fixed inset-0 -z-10 bg-slate-950/60 backdrop-blur-md"></div>
+    <div class="fixed inset-0 -z-10 bg-slate-950/60 backdrop-blur-sm"></div>
 
     <Navbar />
 

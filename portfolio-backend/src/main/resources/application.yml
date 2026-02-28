@@ -33,5 +33,5 @@ spring:
 spring.threads.virtual.enabled: true
 
 upload:
-  path: "file:D:/HomePageProject/HomepageDB/uploads/"
+  path: "D:/HomePageProject/HomepageDB/uploads/"
   base-url: "http://localhost:8080/uploads/"

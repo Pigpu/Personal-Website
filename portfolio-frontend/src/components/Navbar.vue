@@ -52,7 +52,8 @@ const navLinks = [
   { key: "nav.home", path: "/" },
   { key: "nav.career", path: "/career" },
   { key: "nav.articles", path: "/articles" },
-  { key: "nav.projects", path: "/projects" }
+  { key: "nav.projects", path: "/projects" },
+  { key: "nav.about", path: "/about" },
 ];
 </script>
 
@@ -145,8 +146,8 @@ const navLinks = [
                 <div class="w-12 h-12 bg-red-500/20 text-red-400 rounded-2xl flex items-center justify-center mx-auto mb-4 text-xl">
                   ⚠️
                 </div>
-                <h3 class="text-lg font-bold text-white">确认退出？</h3>
-                <p class="text-slate-400 text-xs mt-2">退出后将回到游客身份，无法进行评论等操作</p>
+                <h3 class="text-lg font-bold text-white">{{ t('nav.quit') }}</h3>
+                <p class="text-slate-400 text-xs mt-2">{{ t('nav.quitDesc') }}</p>
               </div>
 
               <div class="space-y-3">
@@ -154,13 +155,13 @@ const navLinks = [
                   @click="handleLogout"
                   class="w-full py-3 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-2xl transition-all shadow-lg shadow-red-500/20"
                 >
-                  确定退出
+                  {{ t('nav.confirm') }}
                 </button>
                 <button
                   @click="showLogoutModal = false"
                   class="w-full py-3 bg-white/5 hover:bg-white/10 text-slate-300 text-sm font-bold rounded-2xl transition-all border border-white/5"
                 >
-                  返回
+                  {{ t('nav.back') }}
                 </button>
               </div>
             </div>
@@ -175,8 +176,8 @@ const navLinks = [
 
             <div class="relative bg-slate-900/90 backdrop-blur-2xl border border-white/10 px-10 py-8 rounded-4xl shadow-2xl flex flex-col items-center scale-in-center">
               <div class="text-4xl mb-4 animate-bounce">👋</div>
-              <h3 class="text-xl font-black text-white">已安全退出</h3>
-              <p class="text-slate-400 text-sm mt-2">期待与你的下一次相遇</p>
+              <h3 class="text-xl font-black text-white">{{ t('nav.quitMes') }}</h3>
+              <p class="text-slate-400 text-sm mt-2">{{ t('nav.quitMes2') }}</p>
             </div>
           </div>
         </Transition>

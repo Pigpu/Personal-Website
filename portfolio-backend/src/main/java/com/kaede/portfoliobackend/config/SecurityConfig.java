@@ -47,6 +47,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
 
                         // 【公开路径】 - 任何人都能看文章、生涯列表、图片
+                        .requestMatchers(HttpMethod.GET, "/api/download").permitAll() //允许所有人调用下载接口
                         .requestMatchers(HttpMethod.GET, "/api/articles", "/api/articles/**").permitAll()
                         // 修正路径匹配：覆盖 /api/career/list 以及未来可能的详情页
                         .requestMatchers(HttpMethod.GET, "/api/career", "/api/career/**").permitAll()
@@ -61,8 +62,7 @@ public class SecurityConfig {
                         // 需要【登录】即可操作：发表评论
                         // 注意：这里用 authenticated()，不需要 ADMIN 角色，只要是注册用户就行
                         .requestMatchers(HttpMethod.POST, "/api/comments/save").authenticated()
-                        // 删除评论必须是管理员 (ADMIN)
-                        .requestMatchers(HttpMethod.DELETE, "/api/comments/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/comments/**").authenticated()
 
                         // 【生涯管理权限】 - 仅限管理员
                         .requestMatchers(HttpMethod.POST, "/api/career/**").hasRole("ADMIN")
@@ -115,6 +115,7 @@ public class SecurityConfig {
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*")); // 允许所有 Header
         configuration.setAllowCredentials(true);
+        configuration.setExposedHeaders(Arrays.asList("Content-Disposition", "Content-Length", "Content-Range", "Accept-Ranges"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

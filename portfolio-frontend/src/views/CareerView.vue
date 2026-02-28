@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import axios from "axios";
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 
 interface Career {
   id?: number;
@@ -148,9 +150,9 @@ onMounted(fetchCareers);
       <header class="max-w-4xl mx-auto flex justify-between items-center mb-12">
         <div>
           <h1 class="text-4xl font-black bg-linear-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
-            生涯经历
+            {{ t('car.title') }}
           </h1>
-          <p class="text-slate-500 text-sm mt-1">这里展示我的生涯经历（只有我可以修改哦）</p>
+          <p class="text-slate-400 text-sm mt-1">{{ t('car.subtitle') }}</p>
         </div>
 
         <button
@@ -363,7 +365,7 @@ onMounted(fetchCareers);
 
           <h3 class="text-xl font-bold text-white mb-2">确认删除？</h3>
           <p class="text-slate-400 text-sm mb-8">
-            此操作不可撤销，这条经历将从你的作品集中永久移除。
+            此操作不可撤销，这条经历将从你的记录中永久移除。
           </p>
 
           <div class="flex gap-3">

@@ -1,17 +1,23 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
+const { t } = useI18n();
 
 const router = useRouter();
 const articles = ref<any[]>([]);
 const showMessageModal = ref(false);
 const messageConfig = ref({
-  type: 'warning', // 'warning', 'error', 'success'
-  title: '提示',
-  content: ''
+  type: "warning", // 'warning', 'error', 'success'
+  title: "提示",
+  content: "",
 });
 
-const showMessage = (type: 'warning' | 'error' | 'success', title: string, content: string) => {
+const showMessage = (
+  type: "warning" | "error" | "success",
+  title: string,
+  content: string
+) => {
   messageConfig.value = { type, title, content };
   showMessageModal.value = true;
   setTimeout(() => {
@@ -39,7 +45,7 @@ const fetchArticles = async () => {
 const deleteArticle = async (id: number) => {
   // 前端权限第一层拦截
   if (!isAdmin.value) {
-    showMessage('warning', '权限不足', '仅管理员可进行删除操作');
+    showMessage("warning", "权限不足", "仅管理员可进行删除操作");
     return;
   }
 
@@ -58,7 +64,7 @@ const deleteArticle = async (id: number) => {
 
     // 2. 后端返回 403 时的处理
     if (response.status === 403 || response.status === 401) {
-      showMessage('warning', '请重新登录', '您的会话已过期或权限不足');
+      showMessage("warning", "请重新登录", "您的会话已过期或权限不足");
       return;
     }
 
@@ -66,11 +72,11 @@ const deleteArticle = async (id: number) => {
       // 成功后，无需刷新页面，直接从本地数组中过滤掉该文章，实现“即时消失”效果
       articles.value = articles.value.filter((article) => article.id !== id);
     } else {
-      showMessage('warning', '删除失败', '服务器响应异常');
+      showMessage("warning", "删除失败", "服务器响应异常");
     }
   } catch (error) {
     console.error("删除请求出错:", error);
-    showMessage('warning', '删除失败', '删除请求出错');
+    showMessage("warning", "删除失败", "删除请求出错");
   }
 };
 
@@ -87,10 +93,10 @@ const goToDetail = (id: number) => {
     <div class="max-w-7xl mx-auto relative">
       <div class="flex justify-between items-center mb-12">
         <div class="text-left">
-          <h2 class="text-4xl font-black bg-linear-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
-            生活瞬间
+          <h2 class="text-4xl font-black bg-linear-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent pb-2 -mb-2">
+            {{ t('life.title') }}
           </h2>
-          <p class="text-slate-500 text-sm mt-1">生活随笔和一些可能的技术分享（可能）</p>
+          <p class="text-slate-400 text-sm mt-1">{{ t('life.subtitle') }}</p>
         </div>
         <button
           v-if="isAdmin"
@@ -196,8 +202,11 @@ const goToDetail = (id: number) => {
     </div>
     <Teleport to="body">
       <Transition name="fade">
-        <div v-if="showMessageModal" class="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none p-6">
-          <div 
+        <div
+          v-if="showMessageModal"
+          class="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none p-6"
+        >
+          <div
             class="bg-slate-900/90 backdrop-blur-2xl border p-8 rounded-[2.5rem] shadow-2xl text-center scale-in-center pointer-events-auto"
             :class="{
               'border-amber-500/30': messageConfig.type === 'warning',
@@ -205,7 +214,7 @@ const goToDetail = (id: number) => {
               'border-emerald-500/30': messageConfig.type === 'success'
             }"
           >
-            <div 
+            <div
               class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl border"
               :class="{
                 'bg-amber-500/10 text-amber-500 border-amber-500/20': messageConfig.type === 'warning',
@@ -215,7 +224,7 @@ const goToDetail = (id: number) => {
             >
               {{ messageConfig.type === 'warning' ? '⚠️' : (messageConfig.type === 'error' ? '❌' : '✨') }}
             </div>
-            
+
             <h3 class="text-xl font-black text-white">{{ messageConfig.title }}</h3>
             <p class="text-slate-400 text-sm mt-2">{{ messageConfig.content }}</p>
           </div>

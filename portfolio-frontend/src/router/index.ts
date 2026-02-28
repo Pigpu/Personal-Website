@@ -2,13 +2,13 @@ import { createRouter, createWebHistory } from 'vue-router'
 // 导入你刚创建的视图组件
 import HomeView from '../views/HomeView.vue'
 import CareerView from '../views/CareerView.vue'
-import MomentsView from '../views/MomentsView.vue'
 import EditorView from '../views/EditorView.vue'
 import ArticlesView from '../views/ArticlesView.vue'
 import ArticleDetailView from '../views/ArticleDetailView.vue'
 import LoginView from '../views/LoginView.vue'
 import ProjectListView from '../views/ProjectListView.vue' 
 import ProjectUploadView from '../views/ProjectUploadView.vue'
+import AboutView from '../views/AboutView.vue'
 
 
 const routes = [
@@ -23,11 +23,6 @@ const routes = [
     component: CareerView
   },
   {
-    path: '/moments',
-    name: 'moments',
-    component: MomentsView
-  },
-  {
     path: '/editor',
     name: 'editor',
     component: EditorView
@@ -36,6 +31,11 @@ const routes = [
     path: '/articles',
     name: 'articles',
     component: ArticlesView
+  },
+  {
+    path: '/about',
+    name: 'about',
+    component: AboutView
   },
   {
     path: '/article/:id',

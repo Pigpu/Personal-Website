@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 </script>
 
 <template>
@@ -11,25 +13,25 @@
       />
     </div>
     <h1 class="text-5xl font-extrabold mb-6 bg-linear-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
-      你好，我是Kaede
+      {{ t('home.greeting') }}
     </h1>
-    <p class="text-xl text-slate-300 mb-3 max-w-2xl leading-relaxed">
-      こんにちは、清水かえでです。
+    <p class="text-xl text-slate-300 mb-3 max-w-3xl leading-relaxed">
+      {{ t('home.intro') }}
     </p>
-    <p class="text-m text-slate-400 max-w-2xl leading-relaxed">
-      这是完全由我自主开发的个人网站。
+    <p class="text-m text-slate-400 max-w-3xl leading-relaxed">
+      {{ t('home.desc1') }}
     </p>
-    <p class="text-m text-slate-400 max-w-2xl leading-relaxed">
-      目前我正在努力寻求机会前往日本攻读计算机专业修士学位。
+    <p class="text-m text-slate-400 max-w-3xl leading-relaxed">
+      {{ t('home.desc2') }}
     </p>
-    <p class="text-m text-slate-400 max-w-2xl leading-relaxed">
-      请联系我：kaedep0828@gmail.com（公开邮箱地址）。
+    <p class="text-m text-slate-400 max-w-3xl leading-relaxed">
+      {{ t('home.contactPublic') }}
     </p>
-    <p class="text-m text-slate-400 max-w-2xl leading-relaxed">
-      若您是持有我的简历的教授，请麻烦您使用我在简历中提供的专用邮箱地址，十分感谢您。
+    <p class="text-m text-slate-400 max-w-6xl leading-relaxed">
+      {{ t('home.contactProf') }}
     </p>
-    <p class="text-xs text-slate-400 max-w-2xl leading-relaxed mt-4">
-      Logo制作者是我的一位朋友，她叫七七。
+    <p class="text-xs text-slate-400 max-w-3xl leading-relaxed mt-4">
+      {{ t('home.logoCredit') }}
     </p>
   </div>
 </template>

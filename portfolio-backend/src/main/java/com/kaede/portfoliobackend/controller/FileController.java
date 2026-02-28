@@ -7,6 +7,12 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.net.URL;
 
 @RestController
 @RequestMapping("/api")
@@ -28,7 +34,6 @@ public class FileController {
     @PostMapping("/upload")
     public String upload(@RequestParam("image") MultipartFile file) {
         if (file.isEmpty()) return "上传失败";
-
         try {
             // 为了保持兼容，老接口的文件继续存在 uploads 根目录下
             String fileName = saveFile(file, "");
@@ -99,5 +104,34 @@ public class FileController {
         file.transferTo(dest);
 
         return fileName;
+    }
+
+    @GetMapping("/download")
+    public ResponseEntity<Resource> downloadFile(@RequestParam String fileUrl) {
+        try {
+            // 兼容绝对路径和相对路径
+            String urlStr = fileUrl.startsWith("http") ? fileUrl : "http://localhost:8080" + fileUrl;
+            URL url = new URL(urlStr);
+            String path = url.getPath();
+
+            // 提取出 uploads 后面的相对路径，比如 files/xxx.pdf
+            String relativePath = path.substring(path.indexOf("/uploads/") + 9);
+
+            // 拼接服务器本地路径
+            Path filePath = Paths.get(BASE_UPLOAD_PATH, relativePath).normalize();
+            Resource resource = new UrlResource(filePath.toUri());
+
+            if (resource.exists()) {
+                return ResponseEntity.ok()
+                        // 🌟 核心：强制触发浏览器下载行为
+                        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
+                        .body(resource);
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
     }
 }

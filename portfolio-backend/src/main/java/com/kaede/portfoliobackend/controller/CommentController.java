@@ -46,20 +46,44 @@ public class CommentController {
                 })
                 .orElse(ResponseEntity.status(404).body("当前登录用户不存在"));
     }
+
     @GetMapping("/article/{articleId}")
     public ResponseEntity<List<Map<String, Object>>> getComments(@PathVariable Long articleId) {
         // 这里直接返回 Map 列表，Spring Boot 会自动把它转成标准的 JSON
         List<Map<String, Object>> comments = commentRepository.findByArticleIdWithUsernames(articleId);
         return ResponseEntity.ok(comments);
     }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteComment(@PathVariable Long id) {
-        // 检查是否存在
-        if (!commentRepository.existsById(id)) {
+        // 1. 获取当前发请求的人的身份
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            return ResponseEntity.status(401).body("请先登录");
+        }
+
+        // 2. 检查这条评论是否存在
+        Comment comment = commentRepository.findById(id).orElse(null);
+        if (comment == null) {
             return ResponseEntity.status(404).body("评论不存在");
         }
-        // 直接删除（数据库级联约束会自动处理子评论）
-        commentRepository.deleteById(id);
-        return ResponseEntity.ok("删除成功");
+
+        // 3. 核心鉴权：判断是否有权限删除
+        String currentUsername = auth.getName();
+        return userRepository.findByUsername(currentUsername)
+                .map(user -> {
+                    // 判断条件：当前用户是评论作者，或者是管理员
+                    boolean isAuthor = comment.getUserId().equals(user.getId());
+                    boolean isAdmin = "ROLE_ADMIN".equals(user.getRole());
+
+                    if (!isAuthor && !isAdmin) {
+                        return ResponseEntity.status(403).body("越权操作：你没有权限删除此评论！");
+                    }
+
+                    // 权限校验通过，执行删除
+                    commentRepository.deleteById(id);
+                    return ResponseEntity.ok("删除成功");
+                })
+                .orElse(ResponseEntity.status(404).body("当前登录用户不存在"));
     }
 }
