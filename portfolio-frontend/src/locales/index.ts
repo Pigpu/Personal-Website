@@ -9,6 +9,7 @@ const messages = {
       articles: '生活',   // 对应原来的“生活”
       projects: '作品',   // 对应原来的“作品”
       about: '关于',
+      paper: '论文',
       login: '登录',       // 替换原本的“LOGIN”
       quit: "确认退出？",
       quitDesc:"退出后将回到游客身份，无法进行评论等操作",
@@ -133,6 +134,11 @@ const messages = {
       contactTitle: "联系我",
       contactDesc: "如果您在使用过程中遇到任何 Bug，或者有合作、技术交流的意向，欢迎随时通过邮件联系我：",
       other:"来我的其他平台上看看！"
+    },
+    paper: {
+      title: "学术论文",
+      subtitle: "研究成果与学术探索记录",
+      loading:"正在加载论文..."
     }
   },
   en: {
@@ -142,6 +148,7 @@ const messages = {
       articles: 'Life',
       projects: 'Artwork',
       about: 'About',
+      paper: 'Essay',
       login: 'LOGIN',
       quit: "Confirm Logout?",
       quitDesc:"After logging out, you will revert to guest status and will be unable to perform actions such as commenting.",
@@ -266,6 +273,11 @@ const messages = {
       contactTitle: "Get in Touch",
       contactDesc: "If you encounter any bugs, or if you're interested in collaboration or technical discussions, feel free to contact me via email:",
       other:"Come check out my other social media accounts!"
+    },
+    paper: {
+      title: "Essay",
+      subtitle: "Research papers and academic records",
+      loading:"Loading essays..."
     }
   },
   ja: {
@@ -276,6 +288,7 @@ const messages = {
       projects: '作品',
       about: 'アバウト',
       login: 'ログイン',
+      paper: '論文',
       quit: "ログアウトを確認しますか？",
       quitDesc:"ログアウトするとゲスト状態に戻り、コメントなどの操作ができなくなります",
       confirm:"確認します",
@@ -400,6 +413,11 @@ const messages = {
       contactTitle: "お問い合わせ",
       contactDesc: "サイトの不具合（バグ）の報告や、技術的な交流、その他のお問い合わせにつきましては、以下のメールアドレスまでお気軽にご連絡ください：",
       other: "私の他のSNSもチェックしてみてね！"
+    },
+    paper: {
+      title: "論文・研究",
+      subtitle: "研究成果とアカデミックな記録",
+      loading:"論文を読み込んでいます..."
     }
   }
 }

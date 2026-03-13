@@ -36,11 +36,14 @@ public class SecurityConfig {
                 // 1. 开启 CORS 并禁用 CSRF
                 .cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf.disable())
+                .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable()))
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // 允许 Spring 内部的错误转发，把隐藏的 404 打回原形
                         .requestMatchers("/error").permitAll()
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/papers/list").permitAll()
+                        .requestMatchers("/api/papers/save", "/api/papers/delete/**").hasRole("ADMIN")
 
                         // 显式放行所有 OPTIONS 预检请求（这是解决 CORS 的关键）
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
@@ -74,7 +77,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/articles/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/articles/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/upload").hasRole("ADMIN")
-                        .requestMatchers("/api/upload/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST,"/api/upload/**").hasRole("ADMIN")
 
                         // 【作品管理权限】
                         .requestMatchers(HttpMethod.GET, "/api/projects", "/api/projects/**").permitAll() // 大家都能看

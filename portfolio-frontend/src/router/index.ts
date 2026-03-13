@@ -9,6 +9,7 @@ import LoginView from '../views/LoginView.vue'
 import ProjectListView from '../views/ProjectListView.vue' 
 import ProjectUploadView from '../views/ProjectUploadView.vue'
 import AboutView from '../views/AboutView.vue'
+import PaperView from '../views/PaperView.vue'
 
 
 const routes = [
@@ -51,6 +52,11 @@ const routes = [
     path: '/projects',
     name: 'Projects',
     component: ProjectListView
+  },
+  {
+    path: '/paper',
+    name: 'paper',
+    component: PaperView
   },
   {
     path: '/projects/upload',
