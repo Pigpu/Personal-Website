@@ -11,6 +11,8 @@
 
 ## 数据库和上线
 
+**2026-10-25 更新**：正式数据库已完成本次六张新增表的创建，前后端应用尚未部署。合并 SQL 与执行结果见 `docs/database-preparation-2026-10-25.md`；下文描述的是最初的本地开发步骤。
+
 新增 `homepage_translations`、`homepage_quotes`、`homepage_listening`、`homepage_countdown` 四张 PostgreSQL 表。可重复执行的建表脚本在 `portfolio-backend/src/main/resources/db/manual/homepage.sql`，只新增表，不清理已有数据。
 
 `homepage_listening` 固定使用主键 `id = 1`，数据库 CHECK 约束禁止其他主键；配合主键唯一性，表中最多一条记录。建表脚本初始化一条空记录。保存使用原子覆盖写入，即使同时保存也不会增加历史行。
