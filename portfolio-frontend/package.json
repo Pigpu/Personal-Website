@@ -6,7 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:homepage": "node --experimental-strip-types --test tests/homepage.test.mjs",
+    "test:career": "node --experimental-strip-types --test tests/career.test.mjs",
+    "test:articles": "node --experimental-strip-types --test tests/articles.test.mjs",
+    "test:countdown": "node --experimental-strip-types --test tests/countdown.test.mjs",
+    "test:projects": "node --experimental-strip-types --test tests/projects.test.mjs",
+    "test:about": "node --experimental-strip-types --test tests/about.test.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",

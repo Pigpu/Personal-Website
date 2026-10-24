@@ -1,169 +1,185 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from "vue";
-import axios from "axios";
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-const { t } = useI18n()
+import axios from 'axios'
+import FixedSiteBackground from '../components/FixedSiteBackground.vue'
+import { projectUi } from '../locales/projects'
+import { siteLanguage } from '../services/homepage'
+import { sortedProjects } from '../utils/projects'
+import type { Project, ProjectSort } from '../utils/projects'
+import '../styles/life.css'
 
-const projects = ref<any[]>([]);
-const searchKeyword = ref("");
-const currentSort = ref("latest");
-const userRole = localStorage.getItem("user_role");
+const { t, locale } = useI18n()
+const copy = computed(() => projectUi[siteLanguage(locale.value)])
+const isAdmin = computed(() => localStorage.getItem('user_role') === 'ROLE_ADMIN')
+const projects = ref<Project[]>([])
+const searchKeyword = ref('')
+const currentSort = ref<ProjectSort>('latest')
+const visible = computed(() => sortedProjects(projects.value, currentSort.value))
+const loading = ref(true)
+const error = ref('')
+const failedCovers = ref(new Set<number>())
+const deleteDialog = ref<HTMLDialogElement | null>(null)
+const projectToDelete = ref<Project | null>(null)
+const deleting = ref(false)
+const deleteError = ref('')
+let requestNumber = 0
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+let activeRequest: AbortController | undefined
 
-const fetchProjects = async () => {
+async function fetchProjects() {
+  const request = ++requestNumber
+  activeRequest?.abort()
+  const controller = new AbortController()
+  activeRequest = controller
+  loading.value = true
+  error.value = ''
+  const keyword = searchKeyword.value.trim()
   try {
-    const res = await axios.get(`/api/projects`, {
-      params: { sort: currentSort.value },
-    });
-    projects.value = res.data;
-  } catch (error) {
-    console.error("加载失败", error);
-  }
-};
-
-const handleSearch = async () => {
-  if (!searchKeyword.value) {
-    fetchProjects();
-    return;
-  }
-  const res = await axios.get(`/api/projects/search`, {
-    params: { keyword: searchKeyword.value },
-  });
-  projects.value = res.data;
-};
-
-const handleDelete = async (id: number) => {
-  if (!confirm("确定删除该作品吗？")) return;
-  await axios.delete(`/api/projects/${id}`);
-  fetchProjects();
-};
-
-watch(currentSort, fetchProjects);
-onMounted(fetchProjects);
+    const response = await axios.get<Project[]>(keyword ? '/api/projects/search' : '/api/projects', {
+      params: keyword ? { keyword } : { sort: currentSort.value }, signal: controller.signal,
+    })
+    if (request === requestNumber) projects.value = response.data
+  } catch (cause) {
+    if (request === requestNumber && !axios.isCancel(cause)) error.value = copy.value.loadFailed
+  } finally { if (request === requestNumber) loading.value = false }
+}
+function searchNow() {
+  if (searchTimer) clearTimeout(searchTimer)
+  void fetchProjects()
+}
+watch(searchKeyword, () => {
+  // Invalidate earlier responses immediately, including during the debounce interval.
+  requestNumber++
+  activeRequest?.abort()
+  loading.value = true
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(searchNow, 220)
+})
+watch(currentSort, searchNow)
+function askDelete(project: Project) {
+  if (!isAdmin.value) return
+  projectToDelete.value = project
+  deleteError.value = ''
+  deleteDialog.value?.showModal()
+}
+function closeDelete() { if (!deleting.value) deleteDialog.value?.close() }
+async function deleteProject() {
+  if (!isAdmin.value || !projectToDelete.value || deleting.value) return
+  deleting.value = true
+  deleteError.value = ''
+  try {
+    await axios.delete('/api/projects/' + projectToDelete.value.id)
+    deleteDialog.value?.close()
+    await fetchProjects()
+  } catch (cause) {
+    deleteError.value = axios.isAxiosError(cause) && [401, 403].includes(cause.response?.status || 0) ? copy.value.authFailed : copy.value.deleteFailed
+  } finally { deleting.value = false }
+}
+onMounted(fetchProjects)
+onUnmounted(() => { requestNumber++; activeRequest?.abort(); if (searchTimer) clearTimeout(searchTimer) })
 </script>
 
 <template>
-  <div class="min-h-screen px-6 pb-20">
-    <div class="max-w-7xl mx-auto">
-      <div class="flex justify-between items-center mb-6">
-        <div class="text-left">
-          <h2 class="text-4xl font-black bg-linear-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent pb-2 -mb-2">
-            {{ t('art.title') }}
-          </h2>
-          <p class="text-slate-400 text-sm mt-1">{{ t('art.subtitle') }}</p>
+  <div class="life-scene">
+    <FixedSiteBackground />
+    <div class="life-page works-page">
+      <header class="life-header">
+        <div><p class="life-eyebrow">MADE WITH INTEREST</p><h1 class="life-title">{{ t('art.title') }}</h1><p class="life-subtitle">{{ t('art.subtitle') }}</p></div>
+        <router-link v-if="isAdmin" to="/projects/upload" class="life-action"><span aria-hidden="true">＋</span>{{ t('art.new') }}</router-link>
+      </header>
+      <div class="works-toolbar">
+        <form class="works-search" role="search" @submit.prevent="searchNow">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4.5 4.5" /></svg>
+          <input v-model="searchKeyword" type="search" :placeholder="t('art.search')" :aria-label="copy.search" />
+          <button v-if="searchKeyword" type="button" :aria-label="copy.clear" @click="searchKeyword = ''">×</button>
+        </form>
+        <div class="works-sort" role="group" :aria-label="copy.sort">
+          <button type="button" :aria-pressed="currentSort === 'latest'" @click="currentSort = 'latest'">{{ t('art.mostR') }}</button>
+          <button type="button" :aria-pressed="currentSort === 'likes'" @click="currentSort = 'likes'">{{ t('art.mostS') }}</button>
         </div>
       </div>
-      <div class="flex flex-col md:flex-row gap-6 justify-between items-center mb-12">
-        <div class="relative w-full md:w-96">
-          <input
-            v-model="searchKeyword"
-            @input="handleSearch"
-            type="text"
-            :placeholder="t('art.search')"
-            class="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-12 text-white focus:border-blue-500/50 focus:ring-0 transition-all"
-          />
-          <span class="absolute left-4 top-3.5 text-slate-500">🔍</span>
-        </div>
-
-        <div class="flex items-center gap-2 bg-white/5 p-1 rounded-2xl border border-white/10">
-          <button
-            @click="currentSort = 'latest'"
-            :class="['px-6 py-2 rounded-xl text-sm font-bold transition-all', currentSort === 'latest' ? 'bg-blue-500 text-white shadow-lg' : 'text-slate-400 hover:text-white']"
-          >{{ t('art.mostR') }}</button>
-          <button
-            @click="currentSort = 'likes'"
-            :class="['px-6 py-2 rounded-xl text-sm font-bold transition-all', currentSort === 'likes' ? 'bg-blue-500 text-white shadow-lg' : 'text-slate-400 hover:text-white']"
-          >{{ t('art.mostS') }}</button>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        <router-link
-          v-if="userRole === 'ROLE_ADMIN'"
-          to="/projects/upload"
-          class="group border-2 border-dashed border-white/10 rounded-[2.5rem] flex flex-col items-center justify-center p-10 hover:border-blue-500/50 hover:bg-blue-500/5 transition-all min-h-[400px]"
-        >
-          <div class="w-16 h-16 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center text-3xl mb-4 group-hover:scale-110 transition-transform">+</div>
-          <span class="text-slate-400 font-bold">{{ t('art.new') }}</span>
-        </router-link>
-
-        <div
-          v-for="project in projects"
-          :key="project.id"
-          class="group bg-slate-900/40 border border-white/10 rounded-[2.5rem] overflow-hidden hover:border-white/20 transition-all flex flex-col"
-        >
-          <div class="relative aspect-video overflow-hidden">
-            <img
-              :src="project.coverUrl"
-              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            />
-            <div class="absolute top-4 left-4 px-3 py-1 bg-black/60 backdrop-blur-md rounded-full text-[10px] font-black text-white uppercase tracking-widest">
-              {{ project.mediaType }}
+      <p v-if="loading" class="life-state" role="status">{{ copy.loading }}</p>
+      <div v-else-if="error" class="life-state" role="alert"><p>{{ error }}</p><button type="button" class="life-action" @click="searchNow">{{ copy.retry }}</button></div>
+      <p v-else-if="!visible.length" class="life-state">{{ searchKeyword.trim() ? copy.noResults : copy.empty }}</p>
+      <ul v-else class="works-grid">
+        <li v-for="project in visible" :key="project.id" class="work-card">
+          <router-link :to="'/projects/' + project.id" class="work-card-link">
+            <div class="work-cover">
+              <img v-if="project.coverUrl && !failedCovers.has(project.id)" :src="project.coverUrl" :alt="project.title" loading="lazy" @error="failedCovers.add(project.id)" />
+              <div v-else class="work-cover-fallback"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M9 9h30v30H9zM9 32l10-10 8 7 5-5 7 8" /><circle cx="31" cy="17" r="3" /></svg><span>{{ copy.noCover }}</span></div>
+              <span class="work-type"><svg v-if="project.mediaType === 'AUDIO'" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 17V5l11-2v12M9 9l11-2" /><ellipse cx="5.5" cy="18" rx="3.5" ry="3" /><ellipse cx="16.5" cy="16" rx="3.5" ry="3" /></svg><svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 10 6-10 6Z" /></svg>{{ project.mediaType === 'AUDIO' ? copy.audio : copy.video }}</span>
             </div>
-            <div
-              v-if="userRole === 'ROLE_ADMIN'"
-              class="absolute top-4 right-4 z-30 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300"
-            >
-              <button
-                @click.stop.prevent="$router.push(`/projects/upload?id=${project.id}`)"
-                class="p-2.5 bg-blue-500/20 hover:bg-blue-500 border border-blue-500/50 rounded-xl text-white backdrop-blur-md transition-all"
-                title="编辑作品"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                  />
-                </svg>
-              </button>
-
-              <button
-                @click.stop.prevent="handleDelete(project.id)"
-                class="p-2.5 bg-red-500/20 hover:bg-red-500 border border-red-500/50 rounded-xl text-white backdrop-blur-md transition-all"
-                title="删除作品"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                  />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          <div class="p-6 flex-1 flex flex-col">
-            <h4 class="text-xl font-black text-white mb-2 line-clamp-1">{{ project.title }}</h4>
-            <p class="text-slate-400 text-sm line-clamp-2 mb-6 flex-1">{{ project.description }}</p>
-
-            <div class="flex items-center justify-between pt-4 border-t border-white/5">
-              <div class="flex items-center gap-4 text-[10px] font-bold text-slate-500 uppercase">
-                <span>👁️ {{ project.viewCount }}</span>
-                <span>❤️ {{ project.likeCount }}</span>
+            <div class="work-body">
+              <p v-if="project.category" class="work-category">{{ project.category }}</p>
+              <h2>{{ project.title }}</h2>
+              <p class="work-description">{{ project.description }}</p>
+              <div class="work-footer">
+                <div class="work-stats">
+                  <span :aria-label="copy.views + ': ' + (project.viewCount || 0)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></svg>{{ project.viewCount || 0 }}</span>
+                  <span :aria-label="copy.likes + ': ' + (project.likeCount || 0)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 5a5.5 5.5 0 0 0-8 1 5.5 5.5 0 0 0-8 7l8 8 8-8a5.5 5.5 0 0 0 0-8Z" /></svg>{{ project.likeCount || 0 }}</span>
+                </div>
+                <span class="work-detail">{{ t('art.detail') }}</span>
               </div>
-              <router-link
-                :to="`/projects/${project.id}`"
-                class="text-xs font-black text-blue-400 hover:text-blue-300 uppercase"
-              >{{ t('art.detail') }}</router-link>
             </div>
-          </div>
-        </div>
-      </div>
+          </router-link>
+          <div v-if="isAdmin" class="work-admin"><router-link :to="'/projects/upload?id=' + project.id" class="life-inline-button">{{ copy.edit }}</router-link><button type="button" class="life-inline-button" @click="askDelete(project)">{{ copy.remove }}</button></div>
+        </li>
+      </ul>
     </div>
+    <Teleport to="body">
+      <dialog ref="deleteDialog" class="life-dialog" aria-labelledby="delete-work-title" @click.self="closeDelete" @cancel="deleting && $event.preventDefault()" @close="projectToDelete = null">
+        <div class="life-dialog-content"><header class="life-dialog-header"><h2 id="delete-work-title">{{ copy.deleteTitle }}</h2><button type="button" class="life-dialog-close" :aria-label="copy.close" :disabled="deleting" @click="closeDelete">×</button></header><p>{{ projectToDelete?.title }}</p><p class="life-dialog-note">{{ copy.deleteHint }}</p><p v-if="deleteError" class="life-dialog-error" role="alert">{{ deleteError }}</p><footer class="life-dialog-actions"><button type="button" :disabled="deleting" @click="closeDelete">{{ copy.cancel }}</button><button type="button" class="life-dialog-danger" :disabled="deleting" @click="deleteProject">{{ deleting ? copy.deleting : copy.confirmDelete }}</button></footer></div>
+      </dialog>
+    </Teleport>
   </div>
 </template>
+
+<style scoped>
+.works-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px 30px; margin: 34px 0 26px; padding: 9px 18px; background: #214b8d; border: 1px solid rgb(255 255 255 / 8%); border-radius: 4px; }
+.works-search { display: flex; align-items: center; gap: 11px; flex: 0 1 370px; min-width: 0; }
+.works-search > svg { width: 18px; height: 18px; flex-shrink: 0; fill: none; stroke: #e0e9f8; stroke-width: 1.5; }
+.works-search input { min-width: 0; width: 100%; padding: 11px 0; border: 0; background: transparent; color: #fff; font-size: 13px; border-radius: 2px; }
+.works-search input::placeholder { color: #d2dff3; }
+.works-search input::-webkit-search-cancel-button { display: none; }
+.works-search button { border: 0; background: transparent; color: #fff; padding: 4px 7px; font-size: 21px; line-height: 1; }
+.works-sort { display: flex; align-self: stretch; gap: 6px; }
+.works-sort button { position: relative; padding: 10px 14px; border: 0; border-radius: 3px; background: transparent; color: #d8e5f8; font-size: 13px; }
+.works-sort button:hover, .works-sort button[aria-pressed="true"] { color: #fff; }
+.works-sort button::after { content: ''; position: absolute; bottom: 1px; left: 50%; width: 22px; height: 2px; background: #fff; transform: translateX(-50%) scaleX(0); transition: transform .2s; }
+.works-sort button[aria-pressed="true"]::after { transform: translateX(-50%) scaleX(1); }
+.works-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; gap: 24px; margin: 0; padding: 0; list-style: none; }
+.work-card { min-width: 0; display: flex; flex-direction: column; background: #3261aa; border: 1px solid rgb(255 255 255 / 12%); border-radius: 6px; overflow: hidden; transition: background-color .2s, border-color .2s; }
+.work-card:hover { background: #3666b0; border-color: rgb(255 255 255 / 28%); }
+.work-card-link { display: flex; flex: 1; flex-direction: column; color: #fff; text-decoration: none; }
+.work-card-link:focus-visible { outline-offset: -3px; border-radius: 6px; }
+.work-cover { position: relative; aspect-ratio: 16 / 9; background: #244d8e; overflow: hidden; }
+.work-cover > img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform .25s; }
+.work-card-link:hover .work-cover > img { transform: scale(1.035); }
+.work-cover-fallback { display: flex; height: 100%; justify-content: center; align-items: center; flex-direction: column; gap: 9px; color: #d8e5f8; font-size: 11px; }
+.work-cover-fallback svg { width: 35px; height: 35px; stroke: currentColor; stroke-width: 1.25; fill: none; opacity: .75; }
+.work-type { position: absolute; top: 12px; left: 12px; display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; background: rgb(22 53 102 / 90%); border: 1px solid rgb(255 255 255 / 20%); border-radius: 3px; font-size: 10px; }
+.work-type svg { width: 13px; height: 13px; stroke: currentColor; stroke-width: 1.5; fill: none; }
+.work-body { display: flex; flex: 1; flex-direction: column; padding: 19px 20px 16px; min-width: 0; }
+.work-category { color: #e0e9f8; font-size: 10px; letter-spacing: .06em; margin: 0 0 8px; }
+.work-body h2 { margin: 0; font-size: 19px; line-height: 1.5; font-weight: 500; letter-spacing: -.02em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.work-card-link:hover h2 { text-decoration: underline; text-underline-offset: 4px; }
+.work-description { flex: 1; min-height: 48px; margin: 9px 0 20px; color: #e0e9f8; font-size: 13px; line-height: 1.85; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.work-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-top: 14px; border-top: 1px solid rgb(255 255 255 / 19%); }
+.work-stats { display: flex; gap: 16px; color: #e0e9f8; font-size: 11px; }
+.work-stats span { display: inline-flex; align-items: center; gap: 5px; }
+.work-stats svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
+.work-detail { font-size: 11px; white-space: nowrap; }
+.work-admin { display: flex; justify-content: flex-end; gap: 2px; padding: 0 10px 7px; }
+.work-admin .life-inline-button { font-size: 11px; color: #e0e9f8; }
+@media (max-width: 1000px) { .works-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) {
+  .works-toolbar { margin-top: 26px; padding: 8px 12px; gap: 5px; }
+  .works-search { flex-basis: 100%; }
+  .works-search input { font-size: 12px; }
+  .works-sort { width: 100%; border-top: 1px solid rgb(255 255 255 / 12%); justify-content: flex-end; padding-top: 3px; }
+  .works-sort button { padding: 10px 12px; font-size: 12px; }
+  .works-grid { grid-template-columns: 1fr; gap: 20px; }
+  .work-body { padding: 18px 18px 16px; }
+}
+</style>

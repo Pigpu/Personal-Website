@@ -1,235 +1,161 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
-import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
-const { t } = useI18n();
+import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import axios from 'axios'
+import FixedSiteBackground from '../components/FixedSiteBackground.vue'
+import { articleUi } from '../locales/articles'
+import { siteLanguage } from '../services/homepage'
+import { plainExcerpt, sortedArticles } from '../utils/articles'
+import type { Article, ArticleSort, SortDirection } from '../utils/articles'
+import '../styles/life.css'
 
-const router = useRouter();
-const articles = ref<any[]>([]);
-const showMessageModal = ref(false);
-const messageConfig = ref({
-  type: "warning", // 'warning', 'error', 'success'
-  title: "提示",
-  content: "",
-});
+const { t, locale } = useI18n()
+const copy = computed(() => articleUi[siteLanguage(locale.value)])
+const isAdmin = computed(() => localStorage.getItem('user_role') === 'ROLE_ADMIN')
+const articles = ref<Article[]>([])
+const loading = ref(true)
+const error = ref('')
+const sortKey = ref<ArticleSort>('time')
+const direction = ref<SortDirection>('desc')
+const sorted = computed(() => sortedArticles(articles.value, sortKey.value, direction.value))
+const failedCovers = ref(new Set<number>())
+const deleteDialog = ref<HTMLDialogElement | null>(null)
+const articleToDelete = ref<Article | null>(null)
+const deleting = ref(false)
+const deleteError = ref('')
 
-const showMessage = (
-  type: "warning" | "error" | "success",
-  title: string,
-  content: string
-) => {
-  messageConfig.value = { type, title, content };
-  showMessageModal.value = true;
-  setTimeout(() => {
-    showMessageModal.value = false;
-  }, 2000); // 2秒后自动关闭
-};
-
-// 暂时通过 localStorage 判断角色，等做完登录，这里会自动生效
-const userRole = ref(localStorage.getItem("user_role") || "GUEST");
-
-// 定义一个计算属性，判断是否为管理员
-const isAdmin = computed(() => userRole.value === "ROLE_ADMIN");
-
-// 从后端获取文章列表
-const fetchArticles = async () => {
+function formatDate(value: string | null | undefined) {
+  const date = value ? new Date(value) : null
+  return date && Number.isFinite(date.getTime()) ? date.toLocaleDateString(locale.value === 'en' ? 'en-GB' : locale.value === 'ja' ? 'ja-JP' : 'zh-CN') : '—'
+}
+async function fetchArticles() {
+  loading.value = true
+  error.value = ''
+  try { articles.value = (await axios.get<Article[]>('/api/articles')).data }
+  catch { error.value = copy.value.loadFailed }
+  finally { loading.value = false }
+}
+function askDelete(article: Article) {
+  if (!isAdmin.value) return
+  articleToDelete.value = article
+  deleteError.value = ''
+  deleteDialog.value?.showModal()
+}
+function closeDelete() { if (!deleting.value) deleteDialog.value?.close() }
+async function deleteArticle() {
+  if (!isAdmin.value || !articleToDelete.value || deleting.value) return
+  deleting.value = true
+  deleteError.value = ''
+  const id = articleToDelete.value.id
   try {
-    const response = await fetch("/api/articles");
-    articles.value = await response.json();
-  } catch (error) {
-    console.error("加载文章失败:", error);
-  }
-};
-
-// 删除逻辑
-const deleteArticle = async (id: number) => {
-  // 前端权限第一层拦截
-  if (!isAdmin.value) {
-    showMessage("warning", "权限不足", "仅管理员可进行删除操作");
-    return;
-  }
-
-  // 增加确认弹窗，防止误删
-  if (!confirm("确定要永久删除这篇文章及其关联的物理图片吗？此操作不可撤销。"))
-    return;
-
-  try {
-    const response = await fetch(`/api/articles/${id}`, {
-      method: "DELETE",
-      // 之后登录成功后，这里要带上 Token
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    });
-
-    // 2. 后端返回 403 时的处理
-    if (response.status === 403 || response.status === 401) {
-      showMessage("warning", "请重新登录", "您的会话已过期或权限不足");
-      return;
-    }
-
-    if (response.ok) {
-      // 成功后，无需刷新页面，直接从本地数组中过滤掉该文章，实现“即时消失”效果
-      articles.value = articles.value.filter((article) => article.id !== id);
-    } else {
-      showMessage("warning", "删除失败", "服务器响应异常");
-    }
-  } catch (error) {
-    console.error("删除请求出错:", error);
-    showMessage("warning", "删除失败", "删除请求出错");
-  }
-};
-
-onMounted(fetchArticles);
-
-// 跳转到文章详情页
-const goToDetail = (id: number) => {
-  router.push(`/article/${id}`);
-};
+    await axios.delete(`/api/articles/${id}`)
+    articles.value = articles.value.filter(article => article.id !== id)
+    deleteDialog.value?.close()
+  } catch (cause) {
+    deleteError.value = axios.isAxiosError(cause) && [401, 403].includes(cause.response?.status || 0) ? copy.value.authFailed : copy.value.deleteFailed
+  } finally { deleting.value = false }
+}
+onMounted(fetchArticles)
 </script>
 
 <template>
-  <div class="max-w-7xl mx-auto">
-    <div class="max-w-7xl mx-auto relative">
-      <div class="flex justify-between items-center mb-12">
-        <div class="text-left">
-          <h2 class="text-4xl font-black bg-linear-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent pb-2 -mb-2">
-            {{ t('life.title') }}
-          </h2>
-          <p class="text-slate-400 text-sm mt-1">{{ t('life.subtitle') }}</p>
+  <div class="life-scene">
+    <FixedSiteBackground />
+    <div class="life-page">
+      <header class="life-header">
+        <div><p class="life-eyebrow">LIFE & NOTES</p><h1 class="life-title">{{ t('life.title') }}</h1><p class="life-subtitle">{{ t('life.subtitle') }}</p></div>
+        <router-link v-if="isAdmin" to="/editor" class="life-action"><span aria-hidden="true">＋</span>{{ copy.create }}</router-link>
+      </header>
+      <div class="article-toolbar">
+        <div class="article-sort" role="group" :aria-label="copy.sort">
+          <button type="button" :aria-pressed="sortKey === 'time'" @click="sortKey = 'time'">{{ copy.time }}</button>
+          <button type="button" :aria-pressed="sortKey === 'likes'" @click="sortKey = 'likes'">{{ copy.likes }}</button>
         </div>
-        <button
-          v-if="isAdmin"
-          @click="$router.push('/editor')"
-          class="group flex items-center gap-2 px-6 py-3 bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/50 rounded-2xl backdrop-blur-md transition-all duration-300"
-        >
-          <span class="text-white group-hover:text-white font-bold mr-0.5">开始创作</span>
-          <div class="w-6 h-6 bg-blue-500 rounded-lg flex items-center justify-center text-white group-hover:rotate-90 transition-transform">
-            +
-          </div>
-        </button>
+        <select v-model="direction" class="article-direction" :aria-label="copy.sort">
+          <option value="desc">{{ copy.descending }} · {{ sortKey === 'time' ? copy.newest : copy.mostLiked }}</option>
+          <option value="asc">{{ copy.ascending }} · {{ sortKey === 'time' ? copy.oldest : copy.leastLiked }}</option>
+        </select>
       </div>
-
-    </div>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-      <div
-        v-for="article in articles"
-        :key="article.id"
-        @click="goToDetail(article.id)"
-        class="group cursor-pointer bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-3xl overflow-hidden hover:border-blue-500/50 transition-all duration-500 hover:-translate-y-2 shadow-xl hover:shadow-blue-500/10"
-      >
-        <div
-          v-if="isAdmin"
-          class="absolute top-4 right-4 z-30 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300"
-        >
-          <button
-            @click.stop="$router.push(`/editor?id=${article.id}`)"
-            class="p-2.5 bg-blue-500/20 hover:bg-blue-500 border border-blue-500/50 rounded-xl text-white backdrop-blur-md transition-all"
-            title="编辑文章"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-              />
-            </svg>
-          </button>
-
-          <button
-            @click.stop="deleteArticle(article.id)"
-            class="p-2.5 bg-red-500/20 hover:bg-red-500 border border-red-500/50 rounded-xl text-white backdrop-blur-md transition-all"
-            title="删除文章"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-              />
-            </svg>
-          </button>
-        </div>
-        <div class="h-48 overflow-hidden relative">
-          <img
-            v-if="article.coverUrl"
-            :src="article.coverUrl"
-            class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-          />
-          <div
-            v-else
-            class="w-full h-full bg-linear-to-br from-slate-800 to-slate-900 flex items-center justify-center"
-          >
-            <span class="text-slate-600 font-black text-4xl">LOG</span>
-          </div>
-          <span class="absolute top-4 left-4 px-3 py-1 bg-blue-500/20 backdrop-blur-md border border-blue-500/30 rounded-full text-xs text-blue-300">
-            {{ article.category }}
-          </span>
-        </div>
-
-        <div class="p-6">
-          <h3 class="text-xl font-bold mb-3 group-hover:text-blue-400 transition-colors">
-            {{ article.title }}
-          </h3>
-          <p class="text-slate-400 text-sm line-clamp-2 mb-4 leading-relaxed">
-            {{ article.summary }}
-          </p>
-
-          <div class="flex items-center justify-between text-xs text-slate-500">
-            <div class="flex gap-4">
-              <span>👁️ {{ article.viewCount }}</span>
-              <span>❤️ {{ article.likeCount }}</span>
+      <p v-if="loading" class="life-state" role="status">{{ copy.loading }}</p>
+      <div v-else-if="error" class="life-state" role="alert"><p>{{ error }}</p><button type="button" class="life-action" @click="fetchArticles">{{ copy.retry }}</button></div>
+      <p v-else-if="!sorted.length" class="life-state">{{ copy.empty }}</p>
+      <ol v-else class="article-list">
+        <li v-for="article in sorted" :key="article.id" class="article-row" :class="{ 'article-row--admin': isAdmin }">
+          <router-link :to="`/article/${article.id}`" class="article-row-link">
+            <div class="article-cover">
+              <img v-if="article.coverUrl && !failedCovers.has(article.id)" :src="article.coverUrl" :alt="article.title" loading="lazy" @error="failedCovers.add(article.id)" />
+              <div v-else class="article-cover-fallback"><svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M11 7h26v34H11zM17 16h14M17 23h14M17 30h8" /></svg><span>{{ copy.noCover }}</span></div>
             </div>
-            <span>{{ new Date(article.createdAt).toLocaleDateString() }}</span>
-          </div>
-        </div>
-      </div>
+            <div class="article-body">
+              <p class="article-category">{{ article.category }}</p>
+              <h2>{{ article.title }}</h2>
+              <p class="article-excerpt">{{ plainExcerpt(article.content || article.summary) }}</p>
+              <div class="article-meta">
+                <span :aria-label="`${copy.views}: ${article.viewCount || 0}`"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></svg>{{ article.viewCount || 0 }}</span>
+                <span :aria-label="`${copy.likeCount}: ${article.likeCount || 0}`"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" /></svg>{{ article.likeCount || 0 }}</span>
+                <time :datetime="article.createdAt || undefined" :aria-label="copy.date">{{ formatDate(article.createdAt) }}</time>
+              </div>
+            </div>
+          </router-link>
+          <div v-if="isAdmin" class="article-admin-actions"><router-link :to="`/editor?id=${article.id}`" class="life-inline-button">{{ copy.edit }}</router-link><button type="button" class="life-inline-button" @click="askDelete(article)">{{ copy.remove }}</button></div>
+        </li>
+      </ol>
     </div>
     <Teleport to="body">
-      <Transition name="fade">
-        <div
-          v-if="showMessageModal"
-          class="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none p-6"
-        >
-          <div
-            class="bg-slate-900/90 backdrop-blur-2xl border p-8 rounded-[2.5rem] shadow-2xl text-center scale-in-center pointer-events-auto"
-            :class="{
-              'border-amber-500/30': messageConfig.type === 'warning',
-              'border-red-500/30': messageConfig.type === 'error',
-              'border-emerald-500/30': messageConfig.type === 'success'
-            }"
-          >
-            <div
-              class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl border"
-              :class="{
-                'bg-amber-500/10 text-amber-500 border-amber-500/20': messageConfig.type === 'warning',
-                'bg-red-500/10 text-red-500 border-red-500/20': messageConfig.type === 'error',
-                'bg-emerald-500/10 text-emerald-500 border-emerald-500/20': messageConfig.type === 'success'
-              }"
-            >
-              {{ messageConfig.type === 'warning' ? '⚠️' : (messageConfig.type === 'error' ? '❌' : '✨') }}
-            </div>
-
-            <h3 class="text-xl font-black text-white">{{ messageConfig.title }}</h3>
-            <p class="text-slate-400 text-sm mt-2">{{ messageConfig.content }}</p>
-          </div>
-        </div>
-      </Transition>
+      <dialog ref="deleteDialog" class="life-dialog" aria-labelledby="delete-article-title" @click.self="closeDelete" @cancel="deleting && $event.preventDefault()" @close="articleToDelete = null">
+        <div class="life-dialog-content"><header class="life-dialog-header"><h2 id="delete-article-title">{{ copy.deleteTitle }}</h2><button type="button" class="life-dialog-close" :aria-label="copy.close" :disabled="deleting" @click="closeDelete">×</button></header><p>{{ articleToDelete?.title }}</p><p class="life-dialog-note">{{ copy.deleteHint }}</p><p v-if="deleteError" class="life-dialog-error" role="alert">{{ deleteError }}</p><footer class="life-dialog-actions"><button type="button" :disabled="deleting" @click="closeDelete">{{ copy.cancel }}</button><button type="button" class="life-dialog-danger" :disabled="deleting" @click="deleteArticle">{{ deleting ? copy.deleting : copy.confirmDelete }}</button></footer></div>
+      </dialog>
     </Teleport>
   </div>
 </template>
+
+<style scoped>
+.article-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-top: 34px; padding: 7px 18px; background: #214b8d; border: 1px solid rgb(255 255 255 / 8%); border-radius: 4px; }
+.article-sort { display: flex; gap: 6px; }
+.article-sort button { position: relative; border: 0; border-radius: 3px; background: transparent; color: #d8e5f8; padding: 11px 14px; font-size: 13px; transition: color .2s; }
+.article-sort button:hover { color: #fff; }
+.article-sort button[aria-pressed="true"] { color: #fff; font-weight: 500; }
+.article-sort button::after { content: ''; position: absolute; left: 50%; bottom: 3px; width: 22px; height: 2px; background: #fff; transform: translateX(-50%) scaleX(0); transition: transform .2s; }
+.article-sort button[aria-pressed="true"]::after { transform: translateX(-50%) scaleX(1); }
+.article-direction { background: transparent; border: 1px solid rgb(255 255 255 / 25%); border-radius: 3px; color: #e0e9f8; padding: 6px 10px; font-size: 12px; }
+.article-direction option { color: #214777; background: #fff; }
+.article-list { display: grid; gap: 20px; list-style: none; margin: 24px 0 0; padding: 0; }
+.article-row { --site-focus: #fff; --article-ink: #fff; --article-muted: #e0e9f8; position: relative; background: #3261aa; color: var(--article-ink); border: 1px solid rgb(255 255 255 / 10%); border-radius: 4px; transition: background-color .2s, border-color .2s; }
+.article-row:hover { background: #3666b0; border-color: rgb(255 255 255 / 22%); }
+.article-row-link { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 28px; align-items: center; padding: 24px; text-decoration: none; color: var(--article-ink); }
+.article-row-link:focus-visible { outline-offset: -4px; border-radius: 4px; }
+.article-cover { width: 100%; aspect-ratio: 16 / 10; overflow: hidden; border: 1px solid rgb(255 255 255 / 14%); border-radius: 3px; background: rgb(255 255 255 / 5%); }
+.article-cover img { width: 100%; height: 100%; object-fit: cover; transition: transform .25s ease; }
+.article-row-link:hover .article-cover img { transform: scale(1.035); }
+.article-row-link:hover h2 { color: #fff; text-decoration: underline; text-underline-offset: 5px; }
+.article-cover-fallback { display: flex; height: 100%; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--article-muted); font-size: 11px; }
+.article-cover-fallback svg { width: 38px; height: 38px; stroke: currentColor; stroke-width: 1.1; opacity: .65; }
+.article-body { min-width: 0; }
+.article-row--admin .article-body { padding-right: 100px; }
+.article-category { margin: 0 0 10px; color: var(--article-muted); font-size: 11px; letter-spacing: .08em; }
+.article-body h2 { margin: 0; font-size: 23px; line-height: 1.55; letter-spacing: -.02em; font-weight: 500; overflow-wrap: anywhere; }
+.article-excerpt { margin: 12px 0 0; color: var(--article-muted); font-size: 14px; line-height: 1.9; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.article-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; color: var(--article-muted); margin-top: 18px; font-size: 11px; line-height: 1.7; }
+.article-meta > span { display: inline-flex; align-items: center; gap: 6px; }
+.article-meta svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.article-admin-actions { position: absolute; right: 15px; bottom: 24px; display: flex; gap: 3px; }
+.article-admin-actions .life-inline-button { color: #e0e9f8; }
+.article-admin-actions .life-inline-button:hover { background: rgb(255 255 255 / 10%); color: #fff; }
+@media (max-width: 900px) { .article-row-link { grid-template-columns: 190px minmax(0, 1fr); gap: 22px; padding: 22px; } .article-row--admin .article-body { padding-right: 0; } .article-row--admin .article-meta { padding-right: 95px; } }
+@media (max-width: 640px) {
+  .article-toolbar { margin-top: 26px; padding: 8px 10px; gap: 12px; }
+  .article-sort button { padding: 9px 10px; font-size: 12px; }
+  .article-direction { max-width: 100%; font-size: 11px; padding: 6px 8px; }
+  .article-list { gap: 16px; margin-top: 20px; }
+  .article-row-link { grid-template-columns: 104px minmax(0, 1fr); align-items: start; gap: 18px; padding: 18px 16px; }
+  .article-cover { aspect-ratio: 1; }
+  .article-body h2 { font-size: 18px; }
+  .article-category { margin-bottom: 6px; font-size: 10px; }
+  .article-excerpt { font-size: 12px; line-height: 1.8; -webkit-line-clamp: 2; margin-top: 8px; }
+  .article-meta { gap: 6px 13px; margin-top: 12px; font-size: 10px; }
+  .article-row--admin .article-row-link { padding-bottom: 8px; }
+  .article-row--admin .article-meta { padding-right: 0; }
+  .article-admin-actions { position: static; justify-content: flex-end; padding: 0 8px 12px; }
+}
+@media (max-width: 380px) { .article-row-link { grid-template-columns: 88px minmax(0, 1fr); gap: 14px; } }
+</style>

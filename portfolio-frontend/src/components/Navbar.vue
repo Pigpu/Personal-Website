@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from "vue-router";
-import { ref, onMounted, onUnmounted, computed } from "vue";
+import { ref, onMounted, onUnmounted, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import axios from "axios"; // 🌟 新增：用于请求天气 API
+import { getCountdown, saveCountdown } from '../services/countdown';
+import { daysUntil, legacyCountdown } from '../utils/countdown';
+import type { Countdown } from '../utils/countdown';
 
 const { t, locale } = useI18n();
 const route = useRoute();
@@ -18,6 +21,7 @@ const isAdmin = computed(
 const changeLang = (lang: "zh" | "en" | "ja") => {
   locale.value = lang;
   localStorage.setItem("site_lang", lang);
+  if (languageDropdown.value) languageDropdown.value.open = false;
 };
 
 const currentLangLabel = computed(() => {
@@ -42,11 +46,17 @@ const handleLogout = () => {
 const navLinks = [
   { key: "nav.home", path: "/" },
   { key: "nav.career", path: "/career" },
-  { key: "nav.paper", path: "/paper" },
   { key: "nav.articles", path: "/articles" },
   { key: "nav.projects", path: "/projects" },
   { key: "nav.about", path: "/about" },
 ];
+
+const isLinkActive = (path: string) => {
+  if (path === "/articles") {
+    return route.path === "/articles" || route.path.startsWith("/article/") || route.path === "/editor";
+  }
+  return path === "/" ? route.path === "/" : route.path.startsWith(path);
+};
 
 // ================= 2. 实时时间逻辑 =================
 const currentTime = ref("");
@@ -71,48 +81,81 @@ const updateTime = () => {
   calculateCountdown();
 };
 
-const countdownEvent = ref(
-  localStorage.getItem("countdown_event") || "JLPT N2"
-);
-const targetDate = ref(localStorage.getItem("countdown_date") || "2026-07-05");
-const daysLeft = ref<number>(0);
+const countdown = ref<Countdown | null>(null);
+const countdownStatus = ref<'loading' | 'ready' | 'error'>('loading');
+const daysLeft = ref<number | null>(null);
 
 const calculateCountdown = () => {
-  const now = new Date();
-  const target = new Date(targetDate.value);
-  now.setHours(0, 0, 0, 0);
-  target.setHours(0, 0, 0, 0);
-  const diffTime = target.getTime() - now.getTime();
-  daysLeft.value = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+  daysLeft.value = countdown.value ? daysUntil(countdown.value.targetDate) : null;
+};
+
+let countdownRequest: Promise<boolean> | null = null;
+const loadCountdown = (): Promise<boolean> => {
+  if (countdownRequest) return countdownRequest;
+  countdownStatus.value = 'loading';
+  countdownRequest = (async () => {
+    try {
+      countdown.value = await getCountdown();
+      calculateCountdown();
+      countdownStatus.value = 'ready';
+      return true;
+    } catch {
+      countdownStatus.value = 'error';
+      return false;
+    } finally { countdownRequest = null; }
+  })();
+  return countdownRequest;
 };
 
 const showCountdownModal = ref(false);
 const editForm = ref({ event: "", date: "" });
+const countdownSaving = ref(false);
+const countdownOpening = ref(false);
+const countdownError = ref('');
+const countdownImported = ref(false);
 
 // 打开弹窗：只有管理员点击才有效
-const openCountdownModal = () => {
-  if (!isAdmin.value) return;
-  editForm.value.event = countdownEvent.value;
-  editForm.value.date = targetDate.value;
+const openCountdownModal = async () => {
+  if (!isAdmin.value || countdownOpening.value) return;
+  countdownOpening.value = true;
+  countdownError.value = '';
+  countdownImported.value = false;
+  const loaded = await loadCountdown();
+  let initial = countdown.value;
+  if (loaded && !initial) {
+    try { initial = legacyCountdown(localStorage.getItem('countdown_event'), localStorage.getItem('countdown_date')); }
+    catch { /* Browser storage is optional. */ }
+    countdownImported.value = !!initial;
+  }
+  editForm.value = { event: initial?.event ?? '', date: initial?.targetDate ?? '' };
+  if (!loaded) countdownError.value = utilityCopy.value.countdownLoadError;
+  countdownOpening.value = false;
   showCountdownModal.value = true;
 };
 
 // 保存配置
-const saveCountdownConfig = () => {
-  if (!editForm.value.event || !editForm.value.date) return; // 简单防空
-
-  // 更新响应式变量
-  countdownEvent.value = editForm.value.event;
-  targetDate.value = editForm.value.date;
-
-  // 存入浏览器本地缓存，刷新不丢失
-  localStorage.setItem("countdown_event", countdownEvent.value);
-  localStorage.setItem("countdown_date", targetDate.value);
-
-  // 重新计算并关闭弹窗
-  calculateCountdown();
-  showCountdownModal.value = false;
+const saveCountdownConfig = async () => {
+  if (!isAdmin.value || countdownSaving.value || countdownStatus.value !== 'ready') return;
+  const event = editForm.value.event.trim();
+  if (!event || event.length > 120 || daysUntil(editForm.value.date) === null) {
+    countdownError.value = utilityCopy.value.countdownInvalid;
+    return;
+  }
+  countdownSaving.value = true;
+  countdownError.value = '';
+  try {
+    countdown.value = await saveCountdown({ event, targetDate: editForm.value.date });
+    calculateCountdown();
+    // Retire the old per-browser configuration only after the shared save succeeds.
+    try { localStorage.removeItem('countdown_event'); localStorage.removeItem('countdown_date'); } catch { /* Optional cleanup. */ }
+    showCountdownModal.value = false;
+  } catch (error) {
+    countdownError.value = axios.isAxiosError(error) && [401, 403].includes(error.response?.status ?? 0)
+      ? utilityCopy.value.countdownForbidden : utilityCopy.value.countdownSaveError;
+  } finally { countdownSaving.value = false; }
 };
+
+const closeCountdownModal = () => { if (!countdownSaving.value) showCountdownModal.value = false; };
 
 // ================= 3. 实时天气逻辑 =================
 const weatherInfo = ref({ temp: "", icon: "🌤️", loading: true });
@@ -148,7 +191,7 @@ const fetchWeather = () => {
 const getWeatherData = async (lat: number, lon: number) => {
   try {
     const res = await axios.get(
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`, { timeout: 10000 }
     );
     const current = res.data.current_weather;
     weatherInfo.value = {
@@ -162,7 +205,37 @@ const getWeatherData = async (lat: number, lon: number) => {
   }
 };
 
+const languageDropdown = ref<HTMLDetailsElement | null>(null);
+const logoutDialog = ref<HTMLDialogElement | null>(null);
+const goodbyeDialog = ref<HTMLDialogElement | null>(null);
+const countdownDialog = ref<HTMLDialogElement | null>(null);
+const utilityCopy = computed(() => {
+  const labels = {
+    zh: { language: '切换语言', weather: '当地天气', loading: '天气加载中', unavailable: '天气暂不可用', countdown: '倒数日设置', event: '事件名称', date: '目标日期', save: '保存配置', cancel: '取消', navigation: '主导航', countdownEmpty: '设置倒计时', countdownLoading: '倒计时加载中', countdownUnavailable: '倒计时暂不可用', countdownLoadError: '无法读取共享配置，请关闭窗口后重试。', countdownSaveError: '保存失败，请重试。你的修改仍保留在窗口中。', countdownForbidden: '请重新使用管理员账号登录后再保存。', countdownInvalid: '请填写事件名称（最多120字）和有效的目标日期。', countdownHint: '保存后对所有访客生效，刷新页面即可看到。每次保存覆盖当前设置。', countdownImported: '已填入此浏览器的旧设置，点击保存后才会同步给所有访客。', saving: '保存中…' },
+    en: { language: 'Change language', weather: 'Local weather', loading: 'Loading weather', unavailable: 'Weather unavailable', countdown: 'Countdown settings', event: 'Event name', date: 'Target date', save: 'Save', cancel: 'Cancel', navigation: 'Main navigation', countdownEmpty: 'Set countdown', countdownLoading: 'Loading countdown', countdownUnavailable: 'Countdown unavailable', countdownLoadError: 'Cannot load shared settings. Close this window and try again.', countdownSaveError: 'Save failed. Your changes are still here; please try again.', countdownForbidden: 'Please sign in again with an administrator account.', countdownInvalid: 'Enter an event name (up to 120 characters) and a valid date.', countdownHint: 'Visitors will see your changes after refreshing. Each save replaces the current settings.', countdownImported: 'Your old browser settings are filled in. Save to share them with all visitors.', saving: 'Saving…' },
+    ja: { language: '言語を変更', weather: '現地の天気', loading: '天気を読み込み中', unavailable: '天気情報を取得できません', countdown: 'カウントダウン設定', event: 'イベント名', date: '目標日', save: '保存', cancel: 'キャンセル', navigation: 'メインナビゲーション', countdownEmpty: 'カウントダウンを設定', countdownLoading: '読み込み中', countdownUnavailable: 'カウントダウンを取得できません', countdownLoadError: '共有設定を取得できません。ウィンドウを閉じて再試行してください。', countdownSaveError: '保存できませんでした。入力内容は保持されています。再試行してください。', countdownForbidden: '管理者アカウントで再ログインしてください。', countdownInvalid: 'イベント名（120文字以内）と有効な日付を入力してください。', countdownHint: '保存後、すべての訪問者に共有され、ページの再読み込みで反映されます。保存のたびに現在の設定を上書きします。', countdownImported: 'このブラウザの旧設定を入力しました。保存するとすべての訪問者に共有されます。', saving: '保存中…' },
+  };
+  return labels[locale.value as keyof typeof labels] || labels.zh;
+});
+
+watch(showLogoutModal, open => { if (open) logoutDialog.value?.showModal(); else logoutDialog.value?.close(); });
+watch(showGoodbyeModal, open => { if (open) goodbyeDialog.value?.showModal(); else goodbyeDialog.value?.close(); });
+watch(showCountdownModal, open => { if (open) countdownDialog.value?.showModal(); else countdownDialog.value?.close(); });
+const closeLanguageMenu = (event: Event) => {
+  if (languageDropdown.value && !languageDropdown.value.contains(event.target as Node)) languageDropdown.value.open = false;
+};
+const closeLanguageOnEscape = (event: KeyboardEvent) => {
+  if (event.key === 'Escape' && languageDropdown.value?.open) {
+    languageDropdown.value.open = false;
+    languageDropdown.value.querySelector('summary')?.focus();
+  }
+};
+watch(() => route.fullPath, () => { if (languageDropdown.value) languageDropdown.value.open = false; });
+
 onMounted(() => {
+  void loadCountdown();
+  document.addEventListener('pointerdown', closeLanguageMenu);
+  document.addEventListener('keydown', closeLanguageOnEscape);
   // 🌟 使用 try...catch 保护初始化钩子，防止任何单一功能报错拖垮整个网页
   try {
     username.value = localStorage.getItem("username");
@@ -178,240 +251,152 @@ onMounted(() => {
 
 onUnmounted(() => {
   clearInterval(timer);
+  document.removeEventListener('pointerdown', closeLanguageMenu);
+  document.removeEventListener('keydown', closeLanguageOnEscape);
 });
 </script>
 
 <template>
-  <div class="fixed top-6 left-0 w-full z-50 flex justify-center pointer-events-none px-6">
-
-    <div class="absolute left-10 top-1/2 -translate-y-1/2 hidden xl:flex items-center gap-5 pointer-events-auto opacity-70 hover:opacity-100 transition-opacity duration-300">
-
-      <div class="flex flex-col items-start">
-        <span class="text-slate-400 text-[11px] font-black tracking-[0.2em] mb-0.5">{{ currentDate }}</span>
-        <span class="text-white text-2xl font-black font-mono drop-shadow-lg tracking-tight">{{ currentTime }}</span>
-      </div>
-
-      <div class="h-8 w-px bg-white/20 rounded-full"></div>
-
-      <div
-        @click="openCountdownModal"
-        class="flex flex-col items-start justify-center bg-blue-500/10 border border-blue-500/20 px-3 py-1.5 rounded-xl shadow-[0_0_15px_rgba(59,130,246,0.15)] transition-all"
-        :class="isAdmin ? 'cursor-pointer hover:bg-blue-500/30 hover:scale-105 active:scale-95' : 'cursor-default hover:bg-blue-500/20'"
-      >
-        <span class="text-blue-400 text-[9px] font-black uppercase tracking-widest mb-0.5">{{ countdownEvent }}</span>
-        <div class="flex items-baseline gap-1 leading-none">
-          <span class="text-slate-300 text-xs font-bold">D-</span>
-          <span class="text-white text-xl font-black font-mono">{{ daysLeft }}</span>
-        </div>
-      </div>
-
-    </div>
-
-    <nav class="w-full max-w-6xl bg-slate-900/50 backdrop-blur-xl border border-white/10 px-6 py-3 rounded-full flex items-center shadow-2xl pointer-events-auto">
-      <div class="flex-1 flex justify-start">
-        <div class="text-xl font-black tracking-tighter text-blue-400 cursor-pointer">
-          About me.
-        </div>
-      </div>
-
-      <div class="flex items-center gap-1">
-        <router-link
-          v-for="link in navLinks"
-          :key="link.path"
-          :to="link.path"
-          class="px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 relative group"
-          :class="route.path === link.path ? 'text-white' : 'text-slate-400 hover:text-slate-200'"
-        >
+  <header class="site-header">
+    <div class="nav-main">
+      <router-link to="/" class="nav-brand">About me<span>.</span></router-link>
+      <nav class="nav-links" :aria-label="utilityCopy.navigation">
+        <router-link v-for="link in navLinks" :key="link.path" :to="link.path"
+          :aria-current="isLinkActive(link.path) ? 'page' : undefined"
+          :class="{ 'is-active': isLinkActive(link.path) }">
           {{ t(link.key) }}
-          <div
-            v-if="route.path === link.path"
-            class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-400 rounded-full shadow-[0_0_8px_#60a5fa]"
-          ></div>
         </router-link>
-      </div>
-
-      <div class="flex-1 flex justify-end gap-4 items-center">
-        <div class="relative group z-50 flex items-center h-full">
-          <div class="px-2 py-2 rounded-full text-xs relative group text-slate-400 hidden md:block">
-            Change language
+      </nav>
+      <div class="nav-actions">
+        <details ref="languageDropdown" class="language-menu">
+          <summary :aria-label="utilityCopy.language">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></svg>
+            <span>{{ currentLangLabel }}</span><span class="language-chevron" aria-hidden="true">⌄</span>
+          </summary>
+          <div class="language-options">
+            <button @click="changeLang('zh')" :aria-pressed="locale === 'zh'">中文<span v-if="locale === 'zh'" aria-hidden="true">✓</span></button>
+            <button @click="changeLang('en')" :aria-pressed="locale === 'en'">English<span v-if="locale === 'en'" aria-hidden="true">✓</span></button>
+            <button @click="changeLang('ja')" :aria-pressed="locale === 'ja'">日本語<span v-if="locale === 'ja'" aria-hidden="true">✓</span></button>
           </div>
-          <button class="flex items-center justify-center w-8 h-8 rounded-full bg-white/5 border border-white/10 text-slate-300 hover:text-white hover:bg-white/10 transition-all">
-            <span class="text-xs font-black">{{ currentLangLabel }}</span>
-          </button>
-
-          <div class="absolute right-0 top-full pt-2 w-32 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 pointer-events-none group-hover:pointer-events-auto">
-            <div class="bg-slate-900/95 backdrop-blur-2xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl py-2 flex flex-col">
-              <button
-                @click="changeLang('zh')"
-                :class="['px-5 py-3 text-sm text-left hover:bg-white/10 transition-colors', locale === 'zh' ? 'text-blue-400 font-bold' : 'text-slate-300']"
-              >🇨🇳 中文</button>
-              <button
-                @click="changeLang('en')"
-                :class="['px-5 py-3 text-sm text-left hover:bg-white/10 transition-colors', locale === 'en' ? 'text-blue-400 font-bold' : 'text-slate-300']"
-              >🇺🇸 English</button>
-              <button
-                @click="changeLang('ja')"
-                :class="['px-5 py-3 text-sm text-left hover:bg-white/10 transition-colors', locale === 'ja' ? 'text-blue-400 font-bold' : 'text-slate-300']"
-              >🇯🇵 日本語</button>
-            </div>
-          </div>
-        </div>
-
-        <router-link
-          v-if="!username"
-          to="/login"
-          class="px-5 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold rounded-full transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)]"
-        >
-          {{ t('nav.login') }}
-        </router-link>
-
-        <button
-          v-else
-          @click="showLogoutModal = true"
-          class="flex items-center gap-2 px-4 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full transition-all group"
-        >
-          <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
-          <span class="text-slate-200 group-hover:text-white text-xs font-bold tracking-wider">
-            {{ username }}
-          </span>
-        </button>
+        </details>
+        <router-link v-if="!username" to="/login" class="nav-login">{{ t('nav.login') }}<span aria-hidden="true">↗</span></router-link>
+        <button v-else class="nav-account" @click="showLogoutModal = true"><span class="account-dot" aria-hidden="true"></span>{{ username }}</button>
       </div>
-    </nav>
-
-    <div class="absolute right-10 top-1/2 -translate-y-1/2 hidden xl:flex items-center gap-3 pointer-events-auto opacity-70 hover:opacity-100 transition-opacity duration-300 bg-slate-900/40 backdrop-blur-md border border-white/10 px-4 py-2 rounded-2xl shadow-xl">
-      <template v-if="!weatherInfo.loading">
-        <span class="text-2xl drop-shadow-md">{{ weatherInfo.icon }}</span>
-        <div class="flex flex-col items-end">
-          <span class="text-slate-400 text-[10px] font-black uppercase tracking-widest leading-none mb-1">Local</span>
-          <span class="text-white text-sm font-bold leading-none">{{ weatherInfo.temp }}</span>
-        </div>
-      </template>
-      <template v-else>
-        <span class="text-slate-400 text-xs animate-pulse">Fetching...</span>
-      </template>
     </div>
+    <div class="nav-utilities">
+      <div class="utility-left">
+        <span class="utility-date">{{ currentDate }}</span><time class="utility-time">{{ currentTime }}</time>
+        <span v-if="isAdmin || countdown || countdownStatus === 'error'" class="utility-divider" aria-hidden="true"></span>
+        <button v-if="isAdmin" class="utility-countdown" @click="openCountdownModal" :disabled="countdownOpening" :aria-label="utilityCopy.countdown">
+          <template v-if="countdownStatus === 'ready' && countdown"><span>{{ countdown.event }}</span><strong v-if="daysLeft !== null">D−{{ daysLeft }}</strong></template>
+          <span v-else>{{ countdownStatus === 'loading' ? utilityCopy.countdownLoading : countdownStatus === 'error' ? utilityCopy.countdownUnavailable : utilityCopy.countdownEmpty }}</span>
+        </button>
+        <span v-else-if="countdownStatus === 'ready' && countdown" class="utility-countdown"><span>{{ countdown.event }}</span><strong v-if="daysLeft !== null">D−{{ daysLeft }}</strong></span>
+        <span v-else-if="countdownStatus === 'error'" class="utility-countdown">{{ utilityCopy.countdownUnavailable }}</span>
+      </div>
+      <div class="utility-weather" :aria-label="utilityCopy.weather">
+        <span v-if="weatherInfo.loading">{{ utilityCopy.loading }}</span>
+        <template v-else-if="weatherInfo.temp"><span aria-hidden="true">{{ weatherInfo.icon }}</span><span>{{ weatherInfo.temp }}</span></template>
+        <span v-else>{{ utilityCopy.unavailable }}</span>
+      </div>
+    </div>
+  </header>
 
-    <Teleport to="body">
-      <Transition name="fade">
-        <div
-          v-if="showLogoutModal"
-          class="fixed inset-0 z-[100] flex items-center justify-center p-6"
-        >
-          <div
-            class="absolute inset-0 bg-slate-950/80 backdrop-blur-md"
-            @click="showLogoutModal = false"
-          ></div>
-          <div class="relative w-full max-w-xs bg-slate-900 border border-white/10 p-8 rounded-[2.5rem] shadow-2xl">
-            <div class="text-center mb-6">
-              <div class="w-12 h-12 bg-red-500/20 text-red-400 rounded-2xl flex items-center justify-center mx-auto mb-4 text-xl">⚠️</div>
-              <h3 class="text-lg font-bold text-white">{{ t('nav.quit') }}</h3>
-              <p class="text-slate-400 text-xs mt-2">{{ t('nav.quitDesc') }}</p>
-            </div>
-            <div class="space-y-3">
-              <button
-                @click="handleLogout"
-                class="w-full py-3 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-2xl transition-all shadow-lg shadow-red-500/20"
-              >{{ t('nav.confirm') }}</button>
-              <button
-                @click="showLogoutModal = false"
-                class="w-full py-3 bg-white/5 hover:bg-white/10 text-slate-300 text-sm font-bold rounded-2xl transition-all border border-white/5"
-              >{{ t('nav.back') }}</button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-      <Transition name="fade">
-        <div
-          v-if="showGoodbyeModal"
-          class="fixed inset-0 z-[100] flex items-center justify-center p-6"
-        >
-          <div class="absolute inset-0 bg-slate-950/80 backdrop-blur-md"></div>
-          <div class="relative bg-slate-900 border border-white/10 px-10 py-8 rounded-[2.5rem] shadow-2xl flex flex-col items-center scale-in-center">
-            <div class="text-4xl mb-4 animate-bounce">👋</div>
-            <h3 class="text-xl font-black text-white">{{ t('nav.quitMes') }}</h3>
-            <p class="text-slate-400 text-sm mt-2">{{ t('nav.quitMes2') }}</p>
-          </div>
-        </div>
-      </Transition>
-      <Transition name="fade">
-        <div
-          v-if="showCountdownModal"
-          class="fixed inset-0 z-[100] flex items-center justify-center p-6"
-        >
-          <div
-            class="absolute inset-0 bg-slate-950/80 backdrop-blur-md"
-            @click="showCountdownModal = false"
-          ></div>
-
-          <div class="relative w-full max-w-sm bg-slate-900 border border-white/10 p-8 rounded-[2rem] shadow-2xl scale-in-center">
-            <h3 class="text-xl font-black text-white mb-6 flex items-center gap-2">
-              <span class="text-blue-400">⏱️</span> 倒数日设置
-            </h3>
-
-            <div class="space-y-4 mb-8">
-              <div class="space-y-1.5">
-                <label class="text-xs font-bold text-slate-400 ml-1">事件名称 (建议简短)</label>
-                <input
-                  v-model="editForm.event"
-                  type="text"
-                  placeholder="例如: JLPT N2"
-                  class="w-full bg-slate-800 border border-white/5 rounded-xl p-3 text-white text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-                />
-              </div>
-
-              <div class="space-y-1.5">
-                <label class="text-xs font-bold text-slate-400 ml-1">目标日期</label>
-                <input
-                  v-model="editForm.date"
-                  type="date"
-                  class="w-full bg-slate-800 border border-white/5 rounded-xl p-3 text-white text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all scheme-dark"
-                />
-              </div>
-            </div>
-
-            <div class="flex gap-3">
-              <button
-                @click="saveCountdownConfig"
-                class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-500/20 active:scale-95"
-              >
-                保存配置
-              </button>
-              <button
-                @click="showCountdownModal = false"
-                class="px-5 bg-white/5 hover:bg-white/10 text-slate-300 font-bold py-3 rounded-xl transition-all border border-white/5 active:scale-95"
-              >
-                取消
-              </button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
-
-  </div>
+  <Teleport to="body">
+    <dialog ref="logoutDialog" class="nav-dialog" aria-labelledby="logout-title" @close="showLogoutModal = false" @click.self="showLogoutModal = false">
+      <div class="nav-dialog-content">
+        <h2 id="logout-title">{{ t('nav.quit') }}</h2><p>{{ t('nav.quitDesc') }}</p>
+        <div class="dialog-actions"><button class="dialog-secondary" @click="showLogoutModal = false">{{ t('nav.back') }}</button><button class="dialog-primary" @click="handleLogout">{{ t('nav.confirm') }}</button></div>
+      </div>
+    </dialog>
+    <dialog ref="goodbyeDialog" class="nav-dialog" aria-labelledby="goodbye-title" @close="showGoodbyeModal = false">
+      <div class="nav-dialog-content"><h2 id="goodbye-title">{{ t('nav.quitMes') }}</h2><p>{{ t('nav.quitMes2') }}</p></div>
+    </dialog>
+    <dialog ref="countdownDialog" class="nav-dialog" aria-labelledby="countdown-title" @close="showCountdownModal = false" @click.self="closeCountdownModal" @cancel.prevent="closeCountdownModal">
+      <form class="nav-dialog-content" @submit.prevent="saveCountdownConfig" :aria-busy="countdownSaving">
+        <h2 id="countdown-title">{{ utilityCopy.countdown }}</h2>
+        <p>{{ countdownImported ? utilityCopy.countdownImported : utilityCopy.countdownHint }}</p>
+        <label for="countdown-event">{{ utilityCopy.event }}</label><input id="countdown-event" v-model="editForm.event" maxlength="120" :disabled="countdownSaving || countdownStatus !== 'ready'" required />
+        <label for="countdown-date">{{ utilityCopy.date }}</label><input id="countdown-date" type="date" min="0001-01-01" max="9999-12-31" v-model="editForm.date" :disabled="countdownSaving || countdownStatus !== 'ready'" required />
+        <p v-if="countdownError" class="countdown-error" role="alert">{{ countdownError }}</p>
+        <div class="dialog-actions"><button type="button" class="dialog-secondary" :disabled="countdownSaving" @click="closeCountdownModal">{{ utilityCopy.cancel }}</button><button type="submit" class="dialog-primary" :disabled="countdownSaving || countdownStatus !== 'ready'">{{ countdownSaving ? utilityCopy.saving : utilityCopy.save }}</button></div>
+      </form>
+    </dialog>
+  </Teleport>
 </template>
 
 <style scoped>
-.scale-in-center {
-  animation: scale-in-center 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+.site-header, .nav-dialog {
+  --site-ink: #214777;
+  --site-muted: #4a6382;
+  --site-line: rgb(33 71 119 / 18%);
+  --site-focus: #2857a5;
 }
-@keyframes scale-in-center {
-  0% {
-    transform: scale(0.9);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
+.site-header { position: sticky; top: 0; z-index: 50; background: #fff; color: var(--site-ink); border-bottom: 1px solid var(--site-line); }
+.nav-main, .nav-utilities { width: calc(100% - clamp(64px, 7vw, 160px)); margin: 0 auto; }
+.nav-main { min-height: 78px; display: grid; grid-template-columns: 180px 1fr 180px; gap: 20px; align-items: center; }
+.nav-brand { font-size: 22px; font-weight: 600; letter-spacing: -.07em; text-decoration: none; color: var(--site-ink); width: fit-content; }
+.nav-brand span { color: var(--site-accent); }
+.nav-links { display: flex; justify-content: space-evenly; gap: 8px; align-self: stretch; }
+.nav-links a { position: relative; display: inline-flex; flex: 1; justify-content: center; align-items: center; padding: 0 12px; white-space: nowrap; color: #4a6382; font-size: 17px; font-weight: 500; letter-spacing: .02em; text-decoration: none; transition: color .2s ease, background-color .2s ease; }
+.nav-links a:focus-visible, .nav-links .is-active { color: var(--site-accent); }
+.nav-links .is-active { font-weight: 600; }
+.nav-links a::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--site-accent); transform: scaleX(0); transform-origin: center; transition: transform .25s cubic-bezier(.2, .7, .3, 1); }
+.nav-links .is-active::after, .nav-links a:focus-visible::after { transform: scaleX(1); }
+.nav-links a:focus-visible { background: rgb(40 87 165 / 8%); outline-offset: -4px; }
+@media (hover: hover) {
+  .nav-links a:hover { color: var(--site-accent); background: rgb(40 87 165 / 8%); }
+  .nav-links a:hover::after { transform: scaleX(1); }
 }
-
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease;
+.nav-actions { display: flex; align-items: center; justify-content: flex-end; gap: 20px; font-size: 12px; }
+.language-menu { position: relative; }
+.language-menu summary { display: flex; align-items: center; gap: 7px; list-style: none; padding: 10px 0; }
+.language-menu summary::-webkit-details-marker { display: none; }
+.language-menu svg { width: 17px; height: 17px; }
+.language-chevron { color: var(--site-muted); margin-left: 1px; }
+.language-options { position: absolute; right: 0; top: calc(100% + 5px); width: 144px; background: #fff; padding: 6px; border: 1px solid var(--site-line); border-radius: 6px; box-shadow: 0 8px 20px rgb(36 60 88 / 10%); }
+.language-options button { display: flex; justify-content: space-between; width: 100%; padding: 10px 12px; text-align: left; border: 0; background: transparent; border-radius: 3px; color: var(--site-ink); }
+.language-options button:hover, .language-options button[aria-pressed="true"] { background: #edf3fc; }
+.nav-login { display: flex; align-items: center; justify-content: center; gap: 17px; background: var(--site-accent); color: #fff; text-decoration: none; padding: 9px 16px; border-radius: 4px; font-size: 12px; white-space: nowrap; }
+.nav-login:hover { background: #294d7c; }
+.nav-account { display: inline-flex; align-items: center; gap: 7px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--site-ink); background: transparent; border: 1px solid var(--site-line); padding: 8px 12px; border-radius: 4px; }
+.account-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--site-accent); flex-shrink: 0; }
+.nav-utilities { display: flex; justify-content: space-between; align-items: center; gap: 18px; min-height: 39px; border-top: 1px solid rgb(36 60 88 / 12%); color: var(--site-muted); font-size: 11px; letter-spacing: .03em; }
+.utility-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.utility-time { font-variant-numeric: tabular-nums; }
+.utility-date { font-variant-numeric: tabular-nums; }
+.utility-divider { width: 1px; height: 11px; background: var(--site-line); }
+.utility-countdown { display: flex; gap: 9px; align-items: center; min-width: 0; background: transparent; border: 0; color: inherit; padding: 0; font-size: inherit; }
+.countdown-error { color: #a12d40 !important; }
+.nav-dialog :disabled { cursor: default; opacity: .55; }
+.utility-countdown > span { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.utility-countdown strong { font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+button.utility-countdown:hover { color: #182e4a; text-decoration: underline; }
+.utility-weather { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.nav-dialog { margin: auto; padding: 0; width: min(400px, calc(100% - 40px)); border: 1px solid var(--site-line); border-radius: 8px; color: var(--site-ink); background: #fff; font-family: var(--font-sans); }
+.nav-dialog::backdrop { background: rgb(24 43 67 / 45%); }
+.nav-dialog-content { padding: 30px; }
+.nav-dialog h2 { font-size: 21px; font-weight: 600; margin: 0 0 16px; }
+.nav-dialog p { font-size: 14px; line-height: 1.8; color: var(--site-muted); }
+.nav-dialog label { display: block; font-size: 12px; margin: 18px 0 8px; }
+.nav-dialog input { display: block; width: 100%; background: #f4f7fc; border: 1px solid #8ba7ca; border-radius: 4px; padding: 10px 12px; color: var(--site-ink); }
+.dialog-actions { display: flex; gap: 12px; margin-top: 26px; justify-content: flex-end; }
+.dialog-actions button { border-radius: 4px; padding: 10px 16px; font-size: 13px; }
+.dialog-primary { background: var(--site-accent); color: #fff; border: 1px solid var(--site-accent); }
+.dialog-secondary { background: transparent; color: var(--site-ink); border: 1px solid #7896ba; }
+@media (max-width: 1000px) { .nav-main { grid-template-columns: 135px 1fr 155px; gap: 12px; } .nav-links { gap: 4px; } .nav-links a { font-size: 16px; padding: 0 8px; } .nav-actions { gap: 15px; } }
+@media (max-width: 900px) { .nav-main, .nav-utilities { width: calc(100% - 64px); } }
+@media (max-width: 760px) {
+  .nav-main, .nav-utilities { width: calc(100% - 40px); }
+  .nav-main { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0; padding-top: 13px; }
+  .nav-brand { font-size: 21px; }
+  .nav-actions { min-height: 36px; }
+  .nav-links { order: 3; flex: 0 0 100%; justify-content: space-between; gap: 4px; overflow-x: auto; margin-top: 8px; }
+  .nav-links a { font-size: 14px; min-height: 44px; padding: 0 6px; }
+  .nav-utilities { min-height: 36px; font-size: 10px; gap: 8px; }
+  .utility-left { gap: 8px; }
+  .utility-countdown > span { max-width: 85px; }
+  .utility-weather { letter-spacing: 0; }
 }
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
+@media (max-width: 370px) { .utility-date { display: none; } }
 </style>

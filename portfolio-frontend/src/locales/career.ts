@@ -1,0 +1,32 @@
+export const careerUi = {
+  zh: {
+    add: '添加经历', edit: '编辑', remove: '删除', addTitle: '记录新的足迹', editTitle: '修改经历',
+    start: '开始日期', end: '结束日期', current: '目前在职 / 在读（至今）', present: '至今', company: '组织 / 机构', position: '职位 / 专业',
+    description: '详细描述', tags: '技术与兴趣标签', tagPlaceholder: '输入标签，按回车添加', addTag: '添加标签', removeTag: '移除标签',
+    companyPlaceholder: '学校、公司或其他组织', positionPlaceholder: '职位、专业或角色', descriptionPlaceholder: '记录这一段经历中做过的事、学到的东西…',
+    save: '保存修改', publish: '添加经历', cancel: '取消', close: '关闭', saving: '保存中…', deleting: '删除中…',
+    deleteTitle: '删除这段经历？', deleteHint: '删除后无法恢复，请确认是否继续。', confirmDelete: '确认删除',
+    loading: '正在整理这些足迹…', empty: '还没有记录经历。', retry: '重新加载', loadFailed: '经历暂时加载失败，请稍后重试。',
+    saveFailed: '保存失败，请稍后重试。', deleteFailed: '删除失败，请稍后重试。', authFailed: '登录已过期或没有管理员权限，请重新登录。',
+  },
+  en: {
+    add: 'Add experience', edit: 'Edit', remove: 'Delete', addTitle: 'A new step', editTitle: 'Edit experience',
+    start: 'Start date', end: 'End date', current: 'Currently working / studying here', present: 'Present', company: 'Organization', position: 'Role / field of study',
+    description: 'Description', tags: 'Skills & interests', tagPlaceholder: 'Type a tag and press Enter', addTag: 'Add tag', removeTag: 'Remove tag',
+    companyPlaceholder: 'School, company or other organization', positionPlaceholder: 'Your role or field of study', descriptionPlaceholder: 'What you did, learned or discovered along the way…',
+    save: 'Save changes', publish: 'Add experience', cancel: 'Cancel', close: 'Close', saving: 'Saving…', deleting: 'Deleting…',
+    deleteTitle: 'Delete this experience?', deleteHint: 'This cannot be undone. Please confirm before continuing.', confirmDelete: 'Delete experience',
+    loading: 'Loading these steps…', empty: 'No experiences recorded yet.', retry: 'Try again', loadFailed: 'Could not load experiences. Please try again.',
+    saveFailed: 'Could not save. Please try again.', deleteFailed: 'Could not delete. Please try again.', authFailed: 'Your session expired or admin access is required. Please log in again.',
+  },
+  ja: {
+    add: '経歴を追加', edit: '編集', remove: '削除', addTitle: '新しい足跡を記録', editTitle: '経歴を編集',
+    start: '開始日', end: '終了日', current: '現在も在職・在学中', present: '現在', company: '組織・学校', position: '役職・専攻',
+    description: '詳細', tags: 'スキル・興味のタグ', tagPlaceholder: 'タグを入力し、Enter で追加', addTag: 'タグを追加', removeTag: 'タグを削除',
+    companyPlaceholder: '学校・会社など', positionPlaceholder: '役職・専攻・担当など', descriptionPlaceholder: '取り組んだことや学んだことを記録しましょう…',
+    save: '変更を保存', publish: '経歴を追加', cancel: 'キャンセル', close: '閉じる', saving: '保存中…', deleting: '削除中…',
+    deleteTitle: 'この経歴を削除しますか？', deleteHint: '削除後は元に戻せません。続行する前にご確認ください。', confirmDelete: '削除する',
+    loading: '足跡を読み込み中…', empty: 'まだ経歴が登録されていません。', retry: '再読み込み', loadFailed: '経歴を読み込めませんでした。もう一度お試しください。',
+    saveFailed: '保存できませんでした。もう一度お試しください。', deleteFailed: '削除できませんでした。もう一度お試しください。', authFailed: 'セッションの期限切れ、または管理者権限がありません。再度ログインしてください。',
+  },
+}

@@ -1,0 +1,41 @@
+.life-scene { position: relative; isolation: isolate; min-height: calc(100svh - 118px); overflow: hidden; }
+.life-page { position: relative; width: min(1120px, calc(100% - 96px)); margin: 0 auto; padding: 68px 0 80px; }
+.life-header { display: flex; justify-content: space-between; align-items: center; gap: 24px; }
+.life-eyebrow { margin: 0 0 18px; color: var(--site-muted); font-size: 11px; font-weight: 500; letter-spacing: .22em; }
+.life-title { font-size: clamp(32px, 3.2vw, 46px); font-weight: 600; letter-spacing: -.04em; line-height: 1.3; margin: 0; }
+.life-subtitle { margin: 15px 0 0; font-size: 14px; color: var(--site-muted); line-height: 1.9; }
+.life-action { display: inline-flex; align-items: center; justify-content: center; gap: 12px; flex-shrink: 0; padding: 11px 18px; color: #fff; border: 1px solid rgb(255 255 255 / 55%); border-radius: 4px; background: transparent; font-size: 13px; text-decoration: none; transition: background-color .2s; }
+.life-action:hover { background: rgb(255 255 255 / 10%); }
+.life-action:disabled { opacity: .55; cursor: default; }
+.life-state { margin: 44px 0; font-size: 14px; color: var(--site-muted); line-height: 1.9; }
+.life-state p { margin: 0 0 12px; }
+.life-inline-button { background: transparent; border: 0; border-radius: 3px; padding: 7px 9px; color: #fff; font-size: 12px; text-decoration: none; }
+.life-inline-button:hover { background: rgb(255 255 255 / 10%); }
+.life-inline-button:disabled { opacity: .5; cursor: default; }
+.life-dialog { --site-focus: #2857a5; width: min(440px, calc(100% - 32px)); max-height: 90svh; margin: auto; padding: 0; color: #214777; background: #fff; border: 1px solid #d4deec; border-radius: 8px; font-family: var(--font-sans); }
+.life-dialog::backdrop { background: rgb(15 30 57 / 58%); }
+.life-dialog-content { padding: 28px 30px; }
+.life-dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.life-dialog h2 { margin: 0; font-size: 21px; font-weight: 600; line-height: 1.5; }
+.life-dialog p { font-size: 14px; line-height: 1.9; overflow-wrap: anywhere; }
+.life-dialog-note { color: #4a6382; }
+.life-dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 26px; }
+.life-dialog button { background: transparent; border: 0; border-radius: 4px; padding: 10px 16px; color: #214777; font-size: 13px; }
+.life-dialog button:hover { background: #edf3fc; }
+.life-dialog button:disabled { opacity: .5; cursor: default; }
+.life-dialog .life-dialog-close { padding: 4px 8px; font-size: 26px; line-height: 1; }
+.life-dialog .life-dialog-primary { background: #2857a5; color: #fff; }
+.life-dialog .life-dialog-primary:hover { background: #214b91; }
+.life-dialog .life-dialog-danger { background: #ab3838; color: #fff; }
+.life-dialog .life-dialog-danger:hover { background: #922c2c; }
+.life-dialog-error { color: #9b332e; background: #fff0ef; border-radius: 4px; padding: 10px 12px; }
+@media (max-width: 900px) { .life-page { width: calc(100% - 64px); padding-top: 40px; } }
+@media (max-width: 640px) {
+  .life-scene { min-height: calc(100svh - 138px); }
+  .life-page { width: calc(100% - 40px); padding: 34px 0 56px; }
+  .life-header { align-items: flex-start; flex-wrap: wrap; gap: 18px; }
+  .life-title { font-size: 34px; }
+  .life-subtitle { font-size: 13px; }
+  .life-action { padding: 9px 13px; font-size: 12px; }
+  .life-dialog-content { padding: 24px 20px; }
+}

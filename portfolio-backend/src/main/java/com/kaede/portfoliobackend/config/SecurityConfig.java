@@ -49,6 +49,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
 
+                        // Homepage content is public; every management endpoint requires a verified admin JWT.
+                        .requestMatchers(HttpMethod.GET, "/api/home", "/api/home/quote", "/api/home/countdown").permitAll()
+                        .requestMatchers("/api/home/admin/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/about").permitAll()
+                        .requestMatchers("/api/about/admin/**").hasRole("ADMIN")
+
                         // 【公开路径】 - 任何人都能看文章、生涯列表、图片
                         .requestMatchers(HttpMethod.GET, "/api/download").permitAll() //允许所有人调用下载接口
                         .requestMatchers(HttpMethod.GET, "/api/articles", "/api/articles/**").permitAll()
@@ -83,7 +89,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/projects", "/api/projects/**").permitAll() // 大家都能看
                         .requestMatchers(HttpMethod.PUT, "/api/projects/*").authenticated() //只有管理员可以修改
                         .requestMatchers("/api/projects/save", "/api/projects/delete/**").hasRole("ADMIN") // 只有管理员能存删
-
 
 
                         .anyRequest().authenticated()

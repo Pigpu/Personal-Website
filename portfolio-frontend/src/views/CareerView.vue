@@ -1,419 +1,303 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
-import axios from "axios";
+import { computed, onMounted, reactive, ref } from 'vue'
+import axios from 'axios'
 import { useI18n } from 'vue-i18n'
-const { t } = useI18n()
+import { careerUi } from '../locales/career'
+import { siteLanguage } from '../services/homepage'
+import { careerPayload, careerPeriod, careerTags, careerToForm } from '../utils/career'
+import type { Career, CareerForm } from '../utils/career'
 
-interface Career {
-  id?: number;
-  period: string;
-  company: string;
-  position: string;
-  description: string;
-  tags: string;
+const { t, locale } = useI18n()
+const copy = computed(() => careerUi[siteLanguage(locale.value)])
+const isAdmin = computed(() => localStorage.getItem('user_role') === 'ROLE_ADMIN')
+const careerList = ref<Career[]>([])
+const loading = ref(true)
+const loadError = ref('')
+const saveError = ref('')
+const deleteError = ref('')
+const isSaving = ref(false)
+const isDeleting = ref(false)
+const isEditing = ref(false)
+const editDialog = ref<HTMLDialogElement | null>(null)
+const deleteDialog = ref<HTMLDialogElement | null>(null)
+const itemToDelete = ref<Career | null>(null)
+const newTag = ref('')
+const emptyForm = (): CareerForm => ({ id: undefined, startDate: '', endDate: '', isCurrent: false, company: '', position: '', description: '', tagsList: [] })
+const form = reactive<CareerForm>(emptyForm())
+
+function errorMessage(error: unknown, fallback: string) {
+  return axios.isAxiosError(error) && [401, 403].includes(error.response?.status || 0) ? copy.value.authFailed : fallback
 }
-
-// 暂时通过 localStorage 判断角色，等做完登录，这里会自动生效
-const userRole = ref(localStorage.getItem('user_role') || 'GUEST');
-
-// 定义一个计算属性，判断是否为管理员
-const isAdmin = computed(() => userRole.value === 'ROLE_ADMIN');
-
-const careerList = ref<Career[]>([]);
-const showModal = ref(false); // 控制弹窗显示
-const isEditing = ref(false);
-const form = ref({
-  id: undefined,
-  startDate: "", // 开始日期
-  endDate: "", // 结束日期
-  isCurrent: false, // 是否至今
-  company: "",
-  position: "",
-  description: "",
-  tagsList: [] as string[], // 改用数组存储标签
-});
-
-const newTag = ref(""); // 当前正在输入的标签名
-
-// 2. 添加标签的逻辑
-const addTag = () => {
-  const tag = newTag.value.trim();
-  if (tag && !form.value.tagsList.includes(tag)) {
-    form.value.tagsList.push(tag);
-  }
-  newTag.value = ""; // 清空输入框
-};
-
-// 3. 移除标签
-const removeTag = (index: number) => {
-  form.value.tagsList.splice(index, 1);
-};
-
-const fetchCareers = async () => {
-  const res = await axios.get("/api/career/list");
-  careerList.value = res.data;
-};
-
-const submitForm = async () => {
-  // 拼接日期字符串
-  const period = form.value.isCurrent
-    ? `${form.value.startDate} - 至今`
-    : `${form.value.startDate} - ${form.value.endDate}`;
-
-  const payload = {
-    ...form.value,
-    period: period,
-    tags: form.value.tagsList.join(","), // 数组转回逗号隔开的字符串
-  };
-
-  await axios.post("/api/career/save", payload);
-  closeModal();
-  fetchCareers();
-};
-
-// 打开弹窗进行新增
-const openAddModal = () => {
-  resetForm();
-  showModal.value = true;
-};
-
-// 打开弹窗进行编辑
-const editItem = (item: any) => {
-  const [start, end] = item.period.split(" - ");
-  form.value = {
-    ...item,
-    startDate: start,
-    endDate: end === "至今" ? "" : end,
-    isCurrent: end === "至今",
-    tagsList: item.tags ? item.tags.split(",") : [],
-  };
-  isEditing.value = true;
-  showModal.value = true;
-};
-
-const closeModal = () => {
-  showModal.value = false;
-  resetForm();
-};
-
-const resetForm = () => {
-  form.value = {
-    id: undefined, // 确保清除 ID，防止“新增”变成“修改”
-    startDate: "", // 清空开始日期
-    endDate: "", // 清空结束日期
-    isCurrent: false, // 默认不勾选“至今”
-    company: "",
-    position: "",
-    description: "",
-    tagsList: [], // 清空标签数组
-  };
-  newTag.value = ""; // 同时清空正在输入的标签文本框
-  isEditing.value = false;
-};
-
-const showDeleteModal = ref(false); // 控制删除弹窗显示
-const itemToDelete = ref<number | null>(null); // 记录待删除的 ID
-
-// 修改函数签名，允许 id 为 number 或 undefined
-const openDeleteModal = (id: number | undefined) => {
-  if (id !== undefined) {
-    itemToDelete.value = id;
-    showDeleteModal.value = true;
-  } else {
-    console.warn("尝试删除一个没有 ID 的项目");
-  }
-};
-
-// 真正执行删除的操作
-const confirmDelete = async () => {
-  if (itemToDelete.value !== null) {
-    await axios.delete(
-      `/api/career/delete/${itemToDelete.value}`
-    );
-    showDeleteModal.value = false;
-    itemToDelete.value = null;
-    fetchCareers(); // 刷新列表
-  }
-};
-
-const closeDeleteModal = () => {
-  showDeleteModal.value = false;
-  itemToDelete.value = null;
-};
-
-onMounted(fetchCareers);
+async function fetchCareers() {
+  loading.value = true
+  loadError.value = ''
+  try { careerList.value = (await axios.get<Career[]>('/api/career/list')).data }
+  catch (error) { loadError.value = errorMessage(error, copy.value.loadFailed) }
+  finally { loading.value = false }
+}
+function resetForm() {
+  Object.assign(form, emptyForm())
+  newTag.value = ''
+  isEditing.value = false
+  saveError.value = ''
+}
+function openAddModal() {
+  if (!isAdmin.value) return
+  resetForm()
+  editDialog.value?.showModal()
+}
+function editItem(item: Career) {
+  if (!isAdmin.value || item.id === undefined) return
+  resetForm()
+  Object.assign(form, careerToForm(item))
+  isEditing.value = true
+  editDialog.value?.showModal()
+}
+function closeModal() { if (!isSaving.value) editDialog.value?.close() }
+function addTag() {
+  const tag = newTag.value.trim()
+  if (tag && !form.tagsList.includes(tag)) form.tagsList.push(tag)
+  newTag.value = ''
+}
+function removeTag(index: number) { form.tagsList.splice(index, 1) }
+async function submitForm() {
+  if (!isAdmin.value || isSaving.value) return
+  if (newTag.value.trim()) addTag()
+  isSaving.value = true
+  saveError.value = ''
+  try {
+    await axios.post('/api/career/save', careerPayload(form))
+    editDialog.value?.close()
+    await fetchCareers()
+  } catch (error) { saveError.value = errorMessage(error, copy.value.saveFailed) }
+  finally { isSaving.value = false }
+}
+function openDeleteModal(item: Career) {
+  if (!isAdmin.value || item.id === undefined) return
+  itemToDelete.value = item
+  deleteError.value = ''
+  deleteDialog.value?.showModal()
+}
+function closeDeleteModal() { if (!isDeleting.value) deleteDialog.value?.close() }
+async function confirmDelete() {
+  if (!isAdmin.value || itemToDelete.value?.id === undefined || isDeleting.value) return
+  isDeleting.value = true
+  deleteError.value = ''
+  try {
+    await axios.delete(`/api/career/delete/${itemToDelete.value.id}`)
+    deleteDialog.value?.close()
+    await fetchCareers()
+  } catch (error) { deleteError.value = errorMessage(error, copy.value.deleteFailed) }
+  finally { isDeleting.value = false }
+}
+onMounted(fetchCareers)
 </script>
 
 <template>
-  <div class="relative min-h-screen text-slate-100 font-sans overflow-x-hidden">
-    <div class="relative z-10 px-8 pb-8">
-      <header class="max-w-4xl mx-auto flex justify-between items-center mb-12">
+  <div class="career-scene">
+    <div class="career-background" aria-hidden="true">
+      <svg class="career-linework career-linework--upper" viewBox="0 0 720 640" fill="none" focusable="false">
+        <path d="M60 -80C30 215 220 440 760 460" />
+        <path d="M120 -80C90 180 260 380 760 400" />
+        <path d="M180 -80C150 145 300 320 760 340" />
+        <path d="M240 -80C210 110 340 260 760 280" />
+      </svg>
+      <svg class="career-linework career-linework--lower" viewBox="0 0 720 640" fill="none" focusable="false">
+        <g transform="translate(720 640) rotate(180)">
+          <path d="M120 -80C90 180 260 380 760 400" />
+          <path d="M180 -80C150 145 300 320 760 340" />
+          <path d="M240 -80C210 110 340 260 760 280" />
+        </g>
+      </svg>
+      <svg class="career-note career-note--small" viewBox="0 0 48 64" fill="none" focusable="false">
+        <path d="M30 44V10C31 18 41 19 41 28" /><ellipse cx="22" cy="47" rx="8" ry="6" transform="rotate(-18 22 47)" />
+      </svg>
+      <svg class="career-note career-note--large" viewBox="0 0 64 64" fill="none" focusable="false">
+        <path d="M22 47V18L50 10V39M22 25L50 17" /><ellipse cx="15" cy="49" rx="7" ry="5" transform="rotate(-18 15 49)" /><ellipse cx="43" cy="41" rx="7" ry="5" transform="rotate(-18 43 41)" />
+      </svg>
+    </div>
+    <div class="career-page">
+      <header class="career-header">
         <div>
-          <h1 class="text-4xl font-black bg-linear-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
-            {{ t('car.title') }}
-          </h1>
-          <p class="text-slate-400 text-sm mt-1">{{ t('car.subtitle') }}</p>
+          <p class="career-eyebrow">EXPERIENCE</p>
+          <h1>{{ t('car.title') }}</h1>
+          <p class="career-subtitle">{{ t('car.subtitle') }}</p>
         </div>
-
-        <button
-          v-if="isAdmin"
-          @click="openAddModal"
-          class="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-full font-bold transition-all shadow-lg shadow-blue-900/40 active:scale-95"
-        >
-          <span class="text-xl">+</span> 添加经历
-        </button>
+        <button v-if="isAdmin" type="button" class="career-add" @click="openAddModal"><span aria-hidden="true">＋</span>{{ copy.add }}</button>
       </header>
 
-      <main class="max-w-4xl mx-auto grid gap-6">
-        <div
-          v-for="item in careerList"
-          :key="item.id"
-          class="group p-8 bg-white/5 border border-white/10 rounded-4xl hover:bg-white/8 transition-all"
-        >
-          <div class="flex justify-between">
-            <div class="space-y-1">
-              <div class="text-blue-500 font-mono text-sm font-bold">{{ item.period }}</div>
-              <h3 class="text-2xl font-bold">{{ item.company }}</h3>
-              <p class="text-slate-400 font-medium">{{ item.position }}</p>
+      <p v-if="loading" class="career-status" role="status">{{ copy.loading }}</p>
+      <div v-else-if="loadError" class="career-status career-load-error" role="alert"><p>{{ loadError }}</p><button type="button" @click="fetchCareers">{{ copy.retry }}</button></div>
+      <p v-else-if="!careerList.length" class="career-status">{{ copy.empty }}</p>
+      <ol v-else class="career-timeline">
+        <li v-for="(item, index) in careerList" :key="item.id ?? index" class="timeline-item" :class="{ 'timeline-item--latest': index === 0 }">
+          <article :aria-labelledby="`career-title-${index}`">
+            <p class="timeline-period">{{ careerPeriod(item, copy.present) }}</p>
+            <div class="timeline-heading">
+              <div class="timeline-heading-copy">
+                <h2 :id="`career-title-${index}`">
+                  <svg class="timeline-icon timeline-company-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 21V4h16v17M9 21v-5h6v5M8 8h1m6 0h1M8 12h1m6 0h1M2 21h20" /></svg>
+                  <span>{{ item.company }}</span>
+                </h2>
+                <p v-if="item.position" class="timeline-position">
+                  <svg class="timeline-icon timeline-role-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="15" rx="2" /><path d="M9 3v4m6-4v4M14 11h4m-4 4h4M6 17c0-2 4-2 4 0" /><circle cx="8" cy="11.5" r="1.5" /></svg>
+                  <span>{{ item.position }}</span>
+                </p>
+              </div>
+              <div v-if="isAdmin" class="timeline-actions">
+                <button type="button" :disabled="item.id === undefined" @click="editItem(item)">{{ copy.edit }}</button>
+                <button type="button" :disabled="item.id === undefined" @click="openDeleteModal(item)">{{ copy.remove }}</button>
+              </div>
             </div>
-            <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button
-                v-if="isAdmin"
-                @click="editItem(item)"
-                class="p-2 text-slate-400 hover:text-blue-400 transition-colors"
-              >编辑</button>
-              <button
-                v-if="isAdmin"
-                @click="openDeleteModal(item.id)"
-                class="p-2 text-slate-400 hover:text-red-400 transition-colors"
-              >删除</button>
-            </div>
-          </div>
-          <p class="mt-4 text-slate-300 leading-relaxed">{{ item.description }}</p>
-          <div
-            v-if="item.tags"
-            class="mt-6 flex flex-wrap gap-2"
-          >
-            <span
-              v-for="tag in item.tags.split(',')"
-              :key="tag"
-              class="px-3 py-1 text-xs font-semibold rounded-lg 
-                 bg-blue-500/10 text-blue-300 border border-blue-500/20
-                 group-hover:bg-blue-500/20 group-hover:border-blue-500/40 transition-colors"
-            >
-              # {{ tag.trim() }}
-            </span>
-          </div>
-        </div>
-      </main>
+            <p v-if="item.description" class="timeline-description">{{ item.description }}</p>
+            <ul v-if="careerTags(item.tags).length" class="timeline-tags">
+              <li v-for="tag in careerTags(item.tags)" :key="tag"><span aria-hidden="true">#</span>{{ tag }}</li>
+            </ul>
+          </article>
+        </li>
+      </ol>
     </div>
 
-    <Transition name="fade">
-      <div
-        v-if="showModal"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
-      >
-        <div
-          class="absolute inset-0 bg-slate-950/60 backdrop-blur-md"
-          @click="closeModal"
-        ></div>
-
-        <div class="relative w-full max-w-lg bg-slate-900 border border-white/20 p-8 rounded-[2.5rem] shadow-2xl overflow-hidden">
-          <h2 class="text-2xl font-bold mb-6">{{ isEditing ? '修改经历信息' : '记录新的足迹' }}</h2>
-
-          <div class="space-y-5">
-            <div class="space-y-2">
-              <label class="text-xs text-slate-500 ml-1">起止时间</label>
-              <div class="flex items-center gap-3">
-                <div class="relative flex-1 group">
-                  <input
-                    type="date"
-                    v-model="form.startDate"
-                    class="w-full bg-slate-800/50 border border-white/10 rounded-xl p-3 text-sm outline-none 
-                  focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/10 transition-all
-                  scheme-dark"
-                  />
-                </div>
-
-                <span class="text-slate-600 font-bold">→</span>
-
-                <div class="relative flex-1 group">
-                  <input
-                    type="date"
-                    v-model="form.endDate"
-                    :disabled="form.isCurrent"
-                    class="w-full bg-slate-800/50 border border-white/10 rounded-xl p-3 text-sm outline-none 
-                  focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/10 transition-all
-                  disabled:opacity-20 disabled:cursor-not-allowed scheme-dark"
-                  />
-                </div>
-              </div>
-              <div class="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10 mt-1">
-                <span class="text-s text-slate-400">目前在职 / 在读（至今）</span>
-                <div
-                  @click="form.isCurrent = !form.isCurrent"
-                  :class="form.isCurrent ? 'bg-blue-600' : 'bg-slate-700'"
-                  class="relative w-11 h-6 rounded-full cursor-pointer transition-colors duration-300"
-                >
-                  <div
-                    :class="form.isCurrent ? 'translate-x-6' : 'translate-x-1'"
-                    class="absolute top-1 w-4 h-4 bg-white rounded-full transition-transform duration-300 shadow-sm"
-                  ></div>
-                </div>
-              </div>
+    <Teleport to="body">
+      <dialog ref="editDialog" class="career-dialog" aria-labelledby="career-editor-title" @click.self="closeModal" @cancel="isSaving && $event.preventDefault()" @close="resetForm">
+        <form class="career-dialog-content" @submit.prevent="submitForm">
+          <header class="career-dialog-header"><h2 id="career-editor-title">{{ isEditing ? copy.editTitle : copy.addTitle }}</h2><button type="button" :aria-label="copy.close" :disabled="isSaving" @click="closeModal">×</button></header>
+          <p v-if="saveError" class="career-dialog-error" role="alert">{{ saveError }}</p>
+          <fieldset :disabled="isSaving">
+            <div class="career-form-grid">
+              <div class="career-field"><label for="career-start">{{ copy.start }}</label><input id="career-start" v-model="form.startDate" type="date" required /></div>
+              <div class="career-field"><label for="career-end">{{ copy.end }}</label><input id="career-end" v-model="form.endDate" type="date" :min="form.startDate" :disabled="form.isCurrent" :required="!form.isCurrent" /></div>
             </div>
-
-            <div class="grid grid-cols-2 gap-4">
-              <div class="space-y-1">
-                <label class="text-xs text-slate-500 ml-1">组织/机构</label>
-                <input
-                  v-model="form.company"
-                  class="w-full bg-slate-800 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="如：重庆邮电大学"
-                />
-              </div>
-              <div class="space-y-1">
-                <label class="text-xs text-slate-500 ml-1">职位/专业</label>
-                <input
-                  v-model="form.position"
-                  class="w-full bg-slate-800 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="如：软件工程"
-                />
-              </div>
+            <label class="career-checkbox"><input v-model="form.isCurrent" type="checkbox" />{{ copy.current }}</label>
+            <div class="career-form-grid">
+              <div class="career-field"><label for="career-company">{{ copy.company }}</label><input id="career-company" v-model="form.company" :placeholder="copy.companyPlaceholder" required /></div>
+              <div class="career-field"><label for="career-position">{{ copy.position }}</label><input id="career-position" v-model="form.position" :placeholder="copy.positionPlaceholder" /></div>
             </div>
-
-            <div class="space-y-1">
-              <label class="text-xs text-slate-500 ml-1">详细描述</label>
-              <textarea
-                v-model="form.description"
-                class="w-full bg-slate-800 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 h-24"
-                placeholder="具体负责的内容或取得的成就..."
-              ></textarea>
+            <div class="career-field"><label for="career-description">{{ copy.description }}</label><textarea id="career-description" v-model="form.description" rows="5" :placeholder="copy.descriptionPlaceholder" /></div>
+            <div class="career-field">
+              <label for="career-tag">{{ copy.tags }}</label>
+              <ul v-if="form.tagsList.length" class="career-edit-tags"><li v-for="(tag, index) in form.tagsList" :key="tag">{{ tag }}<button type="button" :aria-label="`${copy.removeTag}: ${tag}`" @click="removeTag(index)">×</button></li></ul>
+              <div class="career-tag-input"><input id="career-tag" v-model="newTag" :placeholder="copy.tagPlaceholder" @keydown.enter.prevent="addTag" /><button type="button" :aria-label="copy.addTag" @click="addTag">＋</button></div>
             </div>
-
-            <div class="space-y-2">
-              <label class="text-xs text-slate-500 ml-1">技术标签 (回车添加)</label>
-
-              <div
-                v-if="form.tagsList.length > 0"
-                class="flex flex-wrap gap-2 mb-3 animate-in fade-in duration-300"
-              >
-                <span
-                  v-for="(tag, index) in form.tagsList"
-                  :key="index"
-                  class="px-3 py-1 bg-blue-500/10 text-blue-300 rounded-lg text-xs flex items-center gap-2 border border-blue-500/20 group/tag"
-                >
-                  {{ tag }}
-                  <button
-                    @click="removeTag(index)"
-                    class="hover:text-red-400 transition-colors"
-                  >×</button>
-                </span>
-              </div>
-
-              <div class="relative group">
-                <input
-                  v-model="newTag"
-                  @keydown.enter.prevent="addTag"
-                  class="w-full bg-slate-800 rounded-xl p-3 pr-12 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                  placeholder="输入技术按回车添加..."
-                />
-
-                <button
-                  @click="addTag"
-                  class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center 
-                   text-2xl text-slate-500 hover:text-blue-500 hover:bg-blue-500/10 rounded-lg transition-all"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="mt-8 flex gap-3">
-            <button
-              @click="submitForm"
-              class="flex-1 bg-blue-600 hover:bg-blue-500 py-3.5 rounded-2xl font-bold transition-all shadow-lg shadow-blue-900/40"
-            >
-              {{ isEditing ? '确认修改' : '立即发布' }}
-            </button>
-            <button
-              @click="closeModal"
-              class="px-6 bg-slate-800 hover:bg-slate-700 py-3.5 rounded-2xl font-bold transition-colors"
-            >
-              取消
-            </button>
-          </div>
+          </fieldset>
+          <footer class="career-dialog-actions"><button type="button" :disabled="isSaving" @click="closeModal">{{ copy.cancel }}</button><button type="submit" class="career-primary" :disabled="isSaving">{{ isSaving ? copy.saving : isEditing ? copy.save : copy.publish }}</button></footer>
+        </form>
+      </dialog>
+      <dialog ref="deleteDialog" class="career-dialog career-dialog--delete" aria-labelledby="career-delete-title" aria-describedby="career-delete-hint" @click.self="closeDeleteModal" @cancel="isDeleting && $event.preventDefault()" @close="itemToDelete = null">
+        <div class="career-dialog-content">
+          <header class="career-dialog-header"><h2 id="career-delete-title">{{ copy.deleteTitle }}</h2><button type="button" :aria-label="copy.close" :disabled="isDeleting" @click="closeDeleteModal">×</button></header>
+          <p class="career-delete-company">{{ itemToDelete?.company }}</p><p id="career-delete-hint" class="career-delete-hint">{{ copy.deleteHint }}</p>
+          <p v-if="deleteError" class="career-dialog-error" role="alert">{{ deleteError }}</p>
+          <footer class="career-dialog-actions"><button type="button" :disabled="isDeleting" @click="closeDeleteModal">{{ copy.cancel }}</button><button type="button" class="career-danger" :disabled="isDeleting" @click="confirmDelete">{{ isDeleting ? copy.deleting : copy.confirmDelete }}</button></footer>
         </div>
-      </div>
-    </Transition>
-
-    <Transition name="fade">
-      <div
-        v-if="showDeleteModal"
-        class="fixed inset-0 z-60 flex items-center justify-center p-4"
-      >
-        <div
-          class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
-          @click="closeDeleteModal"
-        ></div>
-
-        <div class="relative w-full max-w-sm bg-slate-900 border border-red-500/20 p-8 rounded-4xl shadow-2xl text-center">
-          <div class="mx-auto w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-4">
-            <span class="text-3xl text-red-500">⚠️</span>
-          </div>
-
-          <h3 class="text-xl font-bold text-white mb-2">确认删除？</h3>
-          <p class="text-slate-400 text-sm mb-8">
-            此操作不可撤销，这条经历将从你的记录中永久移除。
-          </p>
-
-          <div class="flex gap-3">
-            <button
-              @click="confirmDelete"
-              class="flex-1 bg-red-600 hover:bg-red-500 py-3 rounded-xl font-bold transition-colors shadow-lg shadow-red-900/40"
-            >
-              确认删除
-            </button>
-            <button
-              @click="closeDeleteModal"
-              class="flex-1 bg-slate-800 hover:bg-slate-700 py-3 rounded-xl font-bold transition-colors"
-            >
-              取消
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-
+      </dialog>
+    </Teleport>
   </div>
 </template>
 
 <style scoped>
-/* 定义弹窗淡入淡出的动效 */
-.fade-enter-active,
-.fade-leave-active {
-  transition: all 0.3s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-  transform: scale(0.95);
-}
-
-/* 隐藏滚动条但保留功能 (选配) */
-::-webkit-scrollbar {
-  width: 0px;
-}
-
-/* 让原生日期选择器的日历图标颜色变亮，或者直接隐藏它（如果你想更简洁） */
-input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: invert(1); /* 反转颜色，让图标在深色背景下变白 */
-  opacity: 0.5;
-  cursor: pointer;
-}
-
-input[type="date"]::-webkit-calendar-picker-indicator:hover {
-  opacity: 1;
+.career-scene { position: relative; isolation: isolate; min-height: calc(100svh - 118px); overflow: hidden; }
+.career-background { position: fixed; inset: 118px 0 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.career-linework { position: absolute; width: 820px; height: auto; stroke: #fff; stroke-width: 1.25; opacity: .28; }
+.career-linework--upper { top: -140px; right: -140px; }
+.career-linework--lower { bottom: -140px; left: -180px; opacity: .24; }
+.career-note { position: absolute; stroke: #fff; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.career-note--small { width: 30px; height: 40px; left: 6%; top: 34%; opacity: .3; transform: rotate(-14deg); }
+.career-note--large { width: 52px; height: 52px; right: 7%; bottom: 14%; opacity: .23; transform: rotate(12deg); }
+.career-page { position: relative; width: min(1120px, calc(100% - 96px)); margin: 0 auto; padding: 68px 0 80px; }
+.career-header { display: flex; align-items: center; justify-content: space-between; gap: 28px; padding-bottom: 36px; border-bottom: 1px solid var(--site-line); }
+.career-eyebrow { margin: 0 0 18px; color: var(--site-muted); font-size: 11px; font-weight: 500; letter-spacing: .22em; }
+h1 { font-size: clamp(32px, 3.2vw, 46px); font-weight: 600; letter-spacing: -.04em; line-height: 1.3; margin: 0; }
+.career-subtitle { margin: 15px 0 0; font-size: 14px; color: var(--site-muted); line-height: 1.9; }
+.career-add { display: inline-flex; align-items: center; gap: 12px; flex-shrink: 0; color: #fff; background: transparent; border: 1px solid rgb(255 255 255 / 55%); padding: 11px 18px; border-radius: 4px; font-size: 13px; transition: background-color .2s; }
+.career-add:hover { background: rgb(255 255 255 / 10%); }
+.career-add > span { font-size: 18px; line-height: 1; }
+.career-timeline { list-style: none; margin: 46px 0 0; padding: 0; }
+.timeline-item { position: relative; padding: 0 0 54px 48px; }
+.timeline-item:last-child { padding-bottom: 0; }
+.timeline-item::before { content: ''; position: absolute; left: 0; top: 3px; width: 13px; height: 13px; border: 2px solid #fff; border-radius: 50%; background: var(--site-blue); z-index: 1; transition: background-color .2s; }
+.timeline-item:not(:last-child)::after { content: ''; position: absolute; left: 6px; top: 10px; bottom: -10px; width: 1px; background: rgb(255 255 255 / 36%); }
+.timeline-item--latest::before { background: #fff; box-shadow: 0 0 0 5px rgb(255 255 255 / 10%); }
+.timeline-period { margin: 0 0 14px; color: var(--site-muted); font-size: 12px; font-variant-numeric: tabular-nums; letter-spacing: .03em; line-height: 1.7; }
+.timeline-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.timeline-heading-copy { min-width: 0; }
+.timeline-heading h2 { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 12px; align-items: start; margin: 0; max-width: 850px; font-size: 23px; font-weight: 500; line-height: 1.55; letter-spacing: -.02em; overflow-wrap: anywhere; }
+.timeline-icon { flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.timeline-company-icon { width: 24px; height: 24px; margin-top: 6px; color: #fff; }
+.timeline-role-icon { width: 20px; height: 20px; margin: 3px 2px 0; }
+.timeline-position { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 12px; align-items: start; margin: 9px 0 0; font-size: 15px; line-height: 1.8; color: var(--site-muted); overflow-wrap: anywhere; }
+.timeline-description { margin: 19px 0 0; max-width: 900px; font-size: 15px; line-height: 1.95; white-space: pre-wrap; overflow-wrap: anywhere; }
+.timeline-tags { display: flex; flex-wrap: wrap; list-style: none; padding: 0; margin: 19px 0 0; gap: 8px; }
+.timeline-tags li { display: inline-flex; gap: 5px; padding: 3px 9px; border: 1px solid rgb(255 255 255 / 22%); border-radius: 4px; background: rgb(255 255 255 / 6%); font-size: 12px; color: var(--site-muted); line-height: 1.8; overflow-wrap: anywhere; }
+.timeline-tags li > span { opacity: .7; }
+.timeline-actions { display: flex; gap: 5px; flex-shrink: 0; }
+.timeline-actions button, .career-load-error button { border: 0; background: transparent; color: #fff; padding: 8px 10px; border-radius: 3px; font-size: 12px; transition: background-color .2s; }
+.timeline-actions button:hover, .career-load-error button:hover { background: rgb(255 255 255 / 10%); }
+.career-status { margin: 46px 0; font-size: 14px; line-height: 1.9; color: var(--site-muted); }
+.career-load-error p { margin: 0 0 8px; }
+.career-load-error button { padding-left: 0; text-decoration: underline; text-underline-offset: 4px; }
+.career-dialog { --site-focus: #2857a5; width: min(640px, calc(100% - 32px)); max-height: 90svh; padding: 0; margin: auto; border: 1px solid #d4deec; border-radius: 8px; background: #fff; color: #214777; font-family: var(--font-sans); }
+.career-dialog::backdrop { background: rgb(15 30 57 / 58%); }
+.career-dialog-content { padding: 28px 32px; }
+.career-dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+.career-dialog-header h2 { font-size: 22px; font-weight: 600; margin: 0; }
+.career-dialog-header > button { padding: 4px 8px; line-height: 1; font-size: 28px; }
+.career-dialog button { border: 0; background: transparent; color: inherit; border-radius: 4px; }
+.career-dialog button:hover { background: #edf3fc; }
+.career-dialog button:disabled { opacity: .5; cursor: default; }
+.career-dialog fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.career-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.career-field { margin-bottom: 20px; min-width: 0; }
+.career-field > label { display: block; margin-bottom: 8px; font-size: 13px; }
+.career-field input, .career-field textarea { display: block; min-width: 0; width: 100%; border: 1px solid #c6d4e8; background: #f6f8fc; color: #214777; border-radius: 4px; padding: 10px 12px; font-size: 14px; line-height: 1.7; }
+.career-field input:disabled { opacity: .5; }
+.career-field textarea { resize: vertical; min-height: 100px; }
+.career-checkbox { display: flex; align-items: center; gap: 9px; margin: 0 0 24px; font-size: 13px; line-height: 1.7; }
+.career-checkbox input { accent-color: #2857a5; }
+.career-edit-tags { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 0 0 12px; padding: 0; }
+.career-edit-tags li { display: inline-flex; align-items: center; gap: 8px; padding: 5px 8px 5px 10px; background: #edf3fc; border-radius: 4px; font-size: 12px; }
+.career-edit-tags button { padding: 2px 5px; font-size: 16px; line-height: 1; }
+.career-tag-input { position: relative; }
+.career-tag-input input { padding-right: 48px; }
+.career-tag-input > button { position: absolute; right: 5px; top: 5px; bottom: 5px; width: 36px; font-size: 22px; }
+.career-dialog-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 22px; border-top: 1px solid #dce5f1; }
+.career-dialog-actions button { padding: 10px 18px; font-size: 13px; }
+.career-dialog-actions .career-primary { background: #2857a5; color: #fff; }
+.career-dialog-actions .career-primary:hover { background: #214b91; }
+.career-dialog-actions .career-danger { background: #ab3838; color: #fff; }
+.career-dialog-actions .career-danger:hover { background: #922c2c; }
+.career-dialog-error { padding: 12px; margin: 0 0 20px; border-radius: 4px; background: #fff0ef; color: #9b332e; font-size: 13px; line-height: 1.8; }
+.career-dialog--delete { width: min(440px, calc(100% - 32px)); }
+.career-delete-company { font-size: 15px; line-height: 1.8; overflow-wrap: anywhere; }
+.career-delete-hint { color: #4a6382; font-size: 13px; line-height: 1.9; }
+@media (max-width: 900px) { .career-page { width: calc(100% - 64px); padding-top: 40px; } }
+@media (max-width: 760px) { .career-background { top: 138px; } }
+@media (max-width: 640px) {
+  .career-page { width: calc(100% - 40px); padding: 34px 0 56px; }
+  .career-scene { min-height: calc(100svh - 138px); }
+  .career-linework { width: 560px; }
+  .career-linework--upper { right: -240px; top: -120px; opacity: .22; }
+  .career-linework--lower { left: -260px; bottom: -160px; opacity: .2; }
+  .career-note--small { left: 8px; top: 48%; width: 22px; opacity: .18; }
+  .career-note--large { right: 10px; bottom: 8%; width: 34px; opacity: .16; }
+  .career-header { align-items: flex-start; gap: 18px; flex-wrap: wrap; padding-bottom: 26px; }
+  h1 { font-size: 34px; }
+  .career-subtitle { font-size: 13px; }
+  .career-add { font-size: 12px; padding: 9px 13px; }
+  .career-timeline { margin-top: 34px; }
+  .timeline-item { padding-left: 30px; padding-bottom: 40px; }
+  .timeline-heading { flex-direction: column; gap: 10px; }
+  .timeline-heading h2 { font-size: 20px; }
+  .timeline-company-icon { margin-top: 3px; }
+  .timeline-role-icon { margin-top: 2px; }
+  .timeline-period { font-size: 11px; margin-bottom: 12px; }
+  .timeline-position, .timeline-description { font-size: 14px; }
+  .timeline-description { margin-top: 16px; }
+  .timeline-actions { gap: 12px; }
+  .timeline-actions button { padding: 6px 0; }
+  .timeline-tags { gap: 8px; }
+  .career-dialog-content { padding: 22px 18px; }
+  .career-form-grid { grid-template-columns: 1fr; gap: 0; }
+  .career-dialog-header h2 { font-size: 20px; }
 }
 </style>
