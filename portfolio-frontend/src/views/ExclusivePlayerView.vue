@@ -73,7 +73,6 @@ onBeforeUnmount(() => { request++; player.value?.pause() })
         <audio v-if="source" ref="player" :key="audio.uuid" :src="source" controls preload="metadata" :aria-label="copy.playerLabel"
           @error="mediaFailed = true; playing = false" @playing="playing = true" @pause="playing = false" @ended="playing = false"></audio>
         <div v-if="mediaFailed" class="premium-media-error" role="alert"><p>{{ copy.mediaFailed }}</p><button v-if="source" type="button" @click="retryMedia">{{ copy.retryMedia }}</button></div>
-        <p v-else class="premium-player-hint">{{ copy.listenHint }}</p>
         <RouterLink class="premium-home" to="/">{{ copy.home }} ↗</RouterLink>
       </article>
     </div>

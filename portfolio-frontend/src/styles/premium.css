@@ -37,8 +37,7 @@
 .premium-player h1 { margin: 0; font-size: 26px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
 .premium-player-intro { margin: 16px 0 28px; color: #4a6382; font-size: 13px; line-height: 1.9; }
 .premium-player audio { display: block; width: 100%; height: 54px; color-scheme: light; }
-.premium-player-hint { margin: 16px 0 26px; color: #4a6382; font-size: 12px; }
-.premium-home { display: inline-block; padding: 8px 0; color: #2857a5; font-size: 12px; text-decoration: none; }
+.premium-home { display: inline-block; margin-top: 14px; padding: 8px 0; color: #2857a5; font-size: 12px; text-decoration: none; }
 .premium-home:hover { text-decoration: underline; text-underline-offset: 5px; }
 .premium-media-error { margin: 16px 0 18px; padding: 12px 14px; background: #edf3fc; border-radius: 4px; text-align: left; }
 .premium-media-error p { margin: 0; color: #4a6382; font-size: 12px; line-height: 1.9; }

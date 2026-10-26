@@ -132,7 +132,7 @@ const messages = {
       purpose2: "整个网站的前后端均由我个人独立开发与部署，这也是我拓展本科时期的学习经验，探索全栈开发技术的一次完整实践。当遇到我解决不了的问题的时候，也曾多次求助于Gemini Pro，这同样是我的一次关于Vibe Coding的重要实验。",
       techStack: "技术栈",
       contactTitle: "联系我",
-      contactDesc: "如果您在使用过程中遇到任何 Bug，或者有合作、技术交流的意向，欢迎随时通过邮件联系我：",
+      contactDesc: "如果您在使用过程中遇到任何 Bug，或者有合作、技术交流的意向，欢迎随时通过邮件或者QQ联系我：",
       other:"来我的其他平台上看看！"
     },
     paper: {
@@ -271,7 +271,7 @@ const messages = {
       purpose2: "The entire website's frontend and backend were independently developed and deployed by me. This served as a comprehensive practice to expand my undergraduate learning experience and explore full-stack development technologies. When encountering problems I couldn't solve, I frequently sought assistance from Gemini Pro, which also constituted a significant experiment for me regarding Vibe Coding.",
       techStack: "Tech Stack",
       contactTitle: "Get in Touch",
-      contactDesc: "If you encounter any bugs, or if you're interested in collaboration or technical discussions, feel free to contact me via email:",
+      contactDesc: "If you encounter any bugs, or if you're interested in collaboration or technical discussions, feel free to contact me via email or QQ:",
       other:"Come check out my other social media accounts!"
     },
     paper: {
@@ -411,7 +411,7 @@ const messages = {
       purpose2: "このウェブサイトのフロントエンドとバックエンドは全て私個人によって独立して開発・デプロイされました。これは学部時代の学習経験を拡大し、フルスタック開発技術を模索する上での完全な実践でもあります。解決できない問題に直面した際には、Gemini Proに何度も助けを求めました。これもまた、Vibe Codingに関する重要な実験の一つでした。",
       techStack: "技術スタック",
       contactTitle: "お問い合わせ",
-      contactDesc: "サイトの不具合（バグ）の報告や、技術的な交流、その他のお問い合わせにつきましては、以下のメールアドレスまでお気軽にご連絡ください：",
+      contactDesc: "サイトの不具合（バグ）の報告や、技術的な交流、その他のお問い合わせにつきましては、メールまたはQQでお気軽にご連絡ください：",
       other: "私の他のSNSもチェックしてみてね！"
     },
     paper: {

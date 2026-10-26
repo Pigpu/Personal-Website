@@ -94,7 +94,7 @@ onUnmounted(() => { requestNumber++ })
         <p v-if="translation.purpose2">{{ translation.purpose2 }}</p>
       </section>
       <section class="about-section" aria-labelledby="friend-links-heading">
-        <header class="about-section-header"><div><h2 id="friend-links-heading">{{ copy.friends }}</h2><p class="about-section-hint">{{ copy.friendsHint }}</p></div><button v-if="isAdmin" type="button" class="life-action" @click="editor?.open('link')"><span aria-hidden="true">＋</span>{{ copy.addLink }}</button></header>
+        <header class="about-section-header"><div><h2 id="friend-links-heading">{{ copy.friends }}</h2></div><button v-if="isAdmin" type="button" class="life-action" @click="editor?.open('link')"><span aria-hidden="true">＋</span>{{ copy.addLink }}</button></header>
         <p v-if="loading" class="about-state" role="status">{{ copy.loading }}</p>
         <div v-else-if="error" class="about-state" role="alert"><p>{{ error }}</p><button type="button" class="life-action" @click="load">{{ copy.retry }}</button></div>
         <p v-else-if="!content.links.length" class="about-state">{{ copy.empty }}</p>
@@ -142,7 +142,6 @@ onUnmounted(() => { requestNumber++ })
 .about-section { margin-top: 52px; border-top: 1px solid rgb(255 255 255 / 28%); padding-top: 36px; }
 .about-section-header { display: flex; justify-content: space-between; align-items: center; gap: 22px; margin-bottom: 25px; }
 .about-page h2 { font-size: 22px; line-height: 1.6; font-weight: 500; letter-spacing: -.02em; margin: 0; }
-.about-section-hint { color: #e0e9f8; font-size: 13px; line-height: 1.9; margin: 9px 0 0; }
 .about-state { font-size: 13px; color: #e0e9f8; line-height: 1.9; margin: 24px 0 0; }
 .about-state p { margin: 0 0 15px; }
 .friend-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; padding: 0; margin: 0; list-style: none; }
