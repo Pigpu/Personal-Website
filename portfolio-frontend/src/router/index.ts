@@ -67,7 +67,23 @@ const routes = [
   path: '/projects/:id', 
   name: 'ProjectDetail',
   component: () => import('../views/ProjectDetailView.vue')
-  }
+  },
+  {
+    path: '/premium-admin',
+    name: 'PremiumAdmin',
+    component: () => import('../views/PremiumAdminView.vue'),
+    meta: {
+      title: '私密音频管理',
+      requiresAuth: true,
+      requiresAdmin: true
+    }
+  },
+  {
+    path: '/exclusive-player/:uuid',
+    name: 'ExclusivePlayer',
+    component: () => import('../views/ExclusivePlayerView.vue'),
+    meta: { title: '专属私享节目' }
+  },
 ]
 
 const router = createRouter({

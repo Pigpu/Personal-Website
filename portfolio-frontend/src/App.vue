@@ -4,7 +4,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Navbar from './components/Navbar.vue'
 const route = useRoute()
-const usesLegacyLayout = computed(() => !['/', '/career', '/articles', '/editor', '/projects', '/about', '/login'].includes(route.path) && !route.path.startsWith('/article/') && !route.path.startsWith('/projects/'))
+const usesLegacyLayout = computed(() => !['/', '/career', '/articles', '/editor', '/projects', '/about', '/login', '/premium-admin'].includes(route.path) && !route.path.startsWith('/article/') && !route.path.startsWith('/projects/') && !route.path.startsWith('/exclusive-player/'))
 const { locale } = useI18n()
 const skipLabels: Record<string, string> = { zh: '跳至正文', en: 'Skip to content', ja: '本文へ移動' }
 </script>
