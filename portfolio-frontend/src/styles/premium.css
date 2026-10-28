@@ -1,4 +1,17 @@
 .premium-page { max-width: 1040px; }
+.premium-header-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; }
+.premium-audience { width: min(640px, calc(100% - 32px)); }
+.premium-audience .premium-audience-hint { font-size: 12px; line-height: 1.9; }
+.premium-audience-search { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: stretch; }
+.premium-audience-section { padding-top: 20px; margin-top: 22px; border-top: 1px solid #dce5f1; }
+.premium-audience-section h3 { margin: 0 0 12px; color: #214777; font-size: 14px; font-weight: 600; }
+.premium-audience-section > p { margin: 8px 0; font-size: 13px; }
+.premium-audience-list { display: grid; gap: 7px; max-height: 240px; overflow: auto; list-style: none; margin: 0; padding: 0; }
+.premium-audience-list li { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 44px; padding: 5px 10px 5px 14px; background: #f1f5fc; border-radius: 4px; }
+.premium-audience-list li > span:first-child { min-width: 0; overflow-wrap: anywhere; font-size: 13px; }
+.premium-audience-list button { flex-shrink: 0; }
+.premium-audience-badge { color: #4a6382; font-size: 11px; white-space: nowrap; }
+.premium-audience .premium-audience-status { margin: 18px 0 0; color: #2857a5; font-size: 13px; }
 .premium-list { display: grid; gap: 14px; margin: 42px 0 0; padding: 0; list-style: none; }
 .premium-row { display: flex; align-items: center; gap: 22px; padding: 24px 26px; background: #3261aa; border: 1px solid rgb(255 255 255 / 18%); border-radius: 5px; }
 .premium-row-note { flex: 0 0 auto; width: 42px; color: #fff; font-size: 40px; line-height: 1; text-align: center; }
@@ -55,6 +68,7 @@
   .premium-row h2 { font-size: 18px; }
 }
 @media (max-width: 640px) {
+  .premium-audience-search { grid-template-columns: 1fr; }
   .premium-list { margin-top: 30px; }
   .premium-player-layout { padding: 32px 20px 48px; }
   .premium-player { padding: 28px 22px 22px; }

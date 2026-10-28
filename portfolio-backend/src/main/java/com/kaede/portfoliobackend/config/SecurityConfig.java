@@ -90,7 +90,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/projects/*").authenticated() //只有管理员可以修改
                         .requestMatchers("/api/projects/save", "/api/projects/delete/**").hasRole("ADMIN") // 只有管理员能存删
 
-                        .requestMatchers(HttpMethod.GET, "/api/premium/play/**").permitAll() // 允许所有人通过 UUID 访问详情
+                        .requestMatchers(HttpMethod.GET, "/api/premium/access", "/api/premium/play/**").permitAll() // 分享链接仍允许直接收听
+                        .requestMatchers(HttpMethod.GET, "/api/premium/list").authenticated()
                         .requestMatchers("/api/premium/admin/**").hasRole("ADMIN")
 
                         .anyRequest().authenticated()

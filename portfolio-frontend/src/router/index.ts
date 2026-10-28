@@ -74,8 +74,7 @@ const routes = [
     component: () => import('../views/PremiumAdminView.vue'),
     meta: {
       title: '私密音频管理',
-      requiresAuth: true,
-      requiresAdmin: true
+      requiresAuth: true
     }
   },
   {

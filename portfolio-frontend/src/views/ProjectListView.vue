@@ -5,6 +5,8 @@ import axios from 'axios'
 import FixedSiteBackground from '../components/FixedSiteBackground.vue'
 import { projectUi } from '../locales/projects'
 import { siteLanguage } from '../services/homepage'
+import { getPremiumAccess } from '../services/premium'
+import { premiumUi } from '../locales/premium'
 import { sortedProjects } from '../utils/projects'
 import type { Project, ProjectSort } from '../utils/projects'
 import '../styles/life.css'
@@ -12,6 +14,8 @@ import '../styles/life.css'
 const { t, locale } = useI18n()
 const copy = computed(() => projectUi[siteLanguage(locale.value)])
 const isAdmin = computed(() => localStorage.getItem('user_role') === 'ROLE_ADMIN')
+const audioCopy = computed(() => premiumUi[siteLanguage(locale.value)])
+const audioAllowed = ref(false)
 const projects = ref<Project[]>([])
 const searchKeyword = ref('')
 const currentSort = ref<ProjectSort>('latest')
@@ -26,6 +30,7 @@ const deleteError = ref('')
 let requestNumber = 0
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 let activeRequest: AbortController | undefined
+let disposed = false
 
 async function fetchProjects() {
   const request = ++requestNumber
@@ -76,8 +81,11 @@ async function deleteProject() {
     deleteError.value = axios.isAxiosError(cause) && [401, 403].includes(cause.response?.status || 0) ? copy.value.authFailed : copy.value.deleteFailed
   } finally { deleting.value = false }
 }
-onMounted(fetchProjects)
-onUnmounted(() => { requestNumber++; activeRequest?.abort(); if (searchTimer) clearTimeout(searchTimer) })
+onMounted(() => {
+  void fetchProjects()
+  void getPremiumAccess().then(access => { if (!disposed) audioAllowed.value = access.allowed }).catch(() => { audioAllowed.value = false })
+})
+onUnmounted(() => { disposed = true; requestNumber++; activeRequest?.abort(); if (searchTimer) clearTimeout(searchTimer) })
 </script>
 
 <template>
@@ -86,7 +94,10 @@ onUnmounted(() => { requestNumber++; activeRequest?.abort(); if (searchTimer) cl
     <div class="life-page works-page">
       <header class="life-header">
         <div><p class="life-eyebrow">MADE WITH INTEREST</p><h1 class="life-title">{{ t('art.title') }}</h1><p class="life-subtitle">{{ t('art.subtitle') }}</p></div>
-        <router-link v-if="isAdmin" to="/projects/upload" class="life-action"><span aria-hidden="true">＋</span>{{ t('art.new') }}</router-link>
+        <div class="works-header-actions">
+          <router-link v-if="audioAllowed" to="/premium-admin" class="life-action"><span aria-hidden="true">♪</span>{{ audioCopy.entry }}</router-link>
+          <router-link v-if="isAdmin" to="/projects/upload" class="life-action"><span aria-hidden="true">＋</span>{{ t('art.new') }}</router-link>
+        </div>
       </header>
       <div class="works-toolbar">
         <form class="works-search" role="search" @submit.prevent="searchNow">
@@ -136,6 +147,7 @@ onUnmounted(() => { requestNumber++; activeRequest?.abort(); if (searchTimer) cl
 </template>
 
 <style scoped>
+.works-header-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; }
 .works-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px 30px; margin: 34px 0 26px; padding: 9px 18px; background: #214b8d; border: 1px solid rgb(255 255 255 / 8%); border-radius: 4px; }
 .works-search { display: flex; align-items: center; gap: 11px; flex: 0 1 370px; min-width: 0; }
 .works-search > svg { width: 18px; height: 18px; flex-shrink: 0; fill: none; stroke: #e0e9f8; stroke-width: 1.5; }

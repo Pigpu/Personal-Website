@@ -4,17 +4,22 @@ import { onBeforeRouteLeave } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import FixedSiteBackground from '../components/FixedSiteBackground.vue'
+import PremiumAudienceEditor from '../components/PremiumAudienceEditor.vue'
 import { premiumUi } from '../locales/premium'
-import { getPremiumList, publishPremiumAudio, uploadPremiumAudio } from '../services/premium'
-import type { PremiumAudio } from '../services/premium'
+import { getPremiumAccess, getPremiumList, publishPremiumAudio, uploadPremiumAudio } from '../services/premium'
+import type { PremiumEpisode } from '../services/premium'
 import { premiumAudioUrl } from '../utils/premium'
 import '../styles/life.css'
 import '../styles/premium.css'
 
 const { locale } = useI18n()
 const copy = computed(() => premiumUi[locale.value === 'en' ? 'en' : locale.value === 'ja' ? 'ja' : 'zh'])
-const isAdmin = computed(() => !!localStorage.getItem('token') && localStorage.getItem('user_role') === 'ROLE_ADMIN')
-const audioList = ref<PremiumAudio[]>([])
+const isAdmin = ref(false)
+const allowed = ref(false)
+const checkedAccess = ref(false)
+const isSignedIn = computed(() => !!localStorage.getItem('token'))
+const audienceEditor = ref<InstanceType<typeof PremiumAudienceEditor> | null>(null)
+const audioList = ref<PremiumEpisode[]>([])
 const loading = ref(true)
 const loadError = ref('')
 const error = ref('')
@@ -39,17 +44,30 @@ function report(cause: unknown, fallback: string) {
   return fallback
 }
 async function fetchList() {
-  if (!isAdmin.value) { loading.value = false; return }
   loading.value = true
   loadError.value = ''
   try {
+    const access = await getPremiumAccess()
+    if (disposed) return
+    isAdmin.value = access.admin
+    allowed.value = access.allowed
+    checkedAccess.value = true
+    if (!access.allowed) { audioList.value = []; return }
     const values = await getPremiumList()
     if (!disposed) audioList.value = [...values].sort((a, b) => b.id - a.id)
   } catch (cause) {
-    if (!disposed) loadError.value = report(cause, copy.value.listFailed)
+    if (!disposed) {
+      audioList.value = []
+      if (axios.isAxiosError(cause) && [401, 403].includes(cause.response?.status || 0)) {
+        allowed.value = false
+        isAdmin.value = false
+      }
+      loadError.value = axios.isAxiosError(cause) && cause.response?.status === 403 ? copy.value.noAccess : report(cause, copy.value.listFailed)
+    }
   } finally { if (!disposed) loading.value = false }
 }
 function openEditor() {
+  if (!isAdmin.value) return
   form.value = { title: '', audioUrl: '' }
   error.value = ''
   uploaded.value = false
@@ -86,7 +104,7 @@ function showNotice(title: string, content: string, link = '') {
 async function handleUpload(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
-  if (!file || busy.value) return
+  if (!file || busy.value || !isAdmin.value) return
   uploading.value = true
   uploaded.value = false
   error.value = ''
@@ -105,7 +123,7 @@ async function handleUpload(event: Event) {
   }
 }
 async function submit() {
-  if (busy.value) return
+  if (busy.value || !isAdmin.value) return
   error.value = ''
   const url = premiumAudioUrl(form.value.audioUrl)
   if (!form.value.title.trim() || !url) { error.value = copy.value.invalid; return }
@@ -124,6 +142,7 @@ async function submit() {
 }
 function playerLink(uuid: string) { return '/exclusive-player/' + encodeURIComponent(uuid) }
 async function copyLink(uuid: string) {
+  if (!isAdmin.value) return
   const url = new URL(playerLink(uuid), window.location.origin).href
   try {
     await navigator.clipboard.writeText(url)
@@ -152,31 +171,31 @@ onBeforeUnmount(() => {
     <FixedSiteBackground />
     <div class="life-page premium-page">
       <header class="life-header">
-        <div>
-          <p class="life-eyebrow">PRIVATE AUDIO</p>
-          <h1 class="life-title">{{ copy.adminTitle }}</h1>
-          <p class="life-subtitle">{{ copy.adminIntro }}</p>
+        <h1 class="life-title">{{ isAdmin ? copy.adminTitle : copy.listenerTitle }}</h1>
+        <div v-if="isAdmin" class="premium-header-actions">
+          <button type="button" class="life-action" @click="audienceEditor?.open()">{{ copy.manageListeners }}</button>
+          <button type="button" class="life-action" @click="openEditor"><span aria-hidden="true">＋</span>{{ copy.publish }}</button>
         </div>
-        <button v-if="isAdmin" type="button" class="life-action" @click="openEditor"><span aria-hidden="true">＋</span>{{ copy.publish }}</button>
       </header>
-      <div v-if="!isAdmin" class="life-state"><p>{{ copy.adminOnly }}</p><RouterLink class="life-action" to="/login">{{ copy.login }}</RouterLink></div>
-      <p v-else-if="loading" class="life-state" role="status">{{ copy.loading }}</p>
+      <p v-if="loading" class="life-state" role="status">{{ copy.loading }}</p>
       <div v-else-if="loadError" class="life-state" role="alert"><p>{{ loadError }}</p><button class="life-action" type="button" @click="fetchList">{{ copy.retry }}</button></div>
-      <p v-else-if="!audioList.length" class="life-state">{{ copy.empty }}</p>
+      <div v-else-if="checkedAccess && !allowed" class="life-state"><p>{{ isSignedIn ? copy.noAccess : copy.signInRequired }}</p><RouterLink v-if="!isSignedIn" class="life-action" to="/login">{{ copy.login }}</RouterLink></div>
+      <p v-else-if="!audioList.length" class="life-state">{{ isAdmin ? copy.empty : copy.emptyListener }}</p>
       <ul v-else class="premium-list">
         <li v-for="item in audioList" :key="item.id" class="premium-row">
           <div class="premium-row-note" aria-hidden="true">♪</div>
           <div class="premium-row-content">
             <time v-if="displayDate(item.createAt)" :datetime="item.createAt || undefined">{{ displayDate(item.createAt) }}</time>
-            <h2>{{ item.title }}</h2><p class="premium-uuid">{{ item.uuid }}</p>
+            <h2>{{ item.title }}</h2><p v-if="isAdmin" class="premium-uuid">{{ item.uuid }}</p>
           </div>
           <div class="premium-row-actions">
             <RouterLink :to="playerLink(item.uuid)" target="_blank" rel="noopener noreferrer" class="life-inline-button">{{ copy.listen }} ↗</RouterLink>
-            <button type="button" class="life-action" @click="copyLink(item.uuid)">{{ copy.copy }}</button>
+            <button v-if="isAdmin" type="button" class="life-action" @click="copyLink(item.uuid)">{{ copy.copy }}</button>
           </div>
         </li>
       </ul>
     </div>
+    <PremiumAudienceEditor v-if="isAdmin" ref="audienceEditor" />
     <Teleport to="body">
       <dialog ref="editor" class="life-dialog premium-editor" aria-labelledby="premium-editor-title" @cancel.prevent="closeEditor" @close="editorOpen = false">
         <form class="life-dialog-content premium-form" @submit.prevent="submit" :aria-busy="busy">
